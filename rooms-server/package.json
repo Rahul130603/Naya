@@ -1,0 +1,13 @@
+{
+  "name": "nayacura-rooms",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Dependency-free presence and WebRTC signaling relay for the Nayacura demo video room.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.mjs"
+  }
+}

@@ -13,11 +13,27 @@ import {
   X,
 } from 'lucide-react';
 import useVideoRoom from '../hooks/useVideoRoom';
-import { fetchSignals, heartbeatRoom, joinRoom, leaveRoom, sendSignal } from '../lib/videoRoom';
+import {
+  fetchSignals,
+  getRoomApiOnline,
+  heartbeatRoom,
+  joinRoom,
+  leaveRoom,
+  sendSignal,
+  subscribeRoomApi,
+} from '../lib/videoRoom';
 
 const ICE_SERVERS = [
   { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
 ];
+const TURN_URL = import.meta.env?.VITE_TURN_URL;
+if (TURN_URL) {
+  ICE_SERVERS.push({
+    urls: TURN_URL,
+    username: import.meta.env?.VITE_TURN_USERNAME || '',
+    credential: import.meta.env?.VITE_TURN_CREDENTIAL || '',
+  });
+}
 const HEARTBEAT_MS = 4000;
 const SIGNAL_POLL_MS = 800;
 
@@ -41,6 +57,7 @@ export default function VideoCallRoom({ roomCode, role, selfName, peerName, appo
   const [localStream, setLocalStream] = useState(null);
   const [remoteStream, setRemoteStream] = useState(null);
   const [pcState, setPcState] = useState('idle');
+  const [roomApiOnline, setRoomApiOnline] = useState(() => getRoomApiOnline());
 
   const videoRef = useRef(null);
   const remoteVideoRef = useRef(null);
@@ -53,6 +70,8 @@ export default function VideoCallRoom({ roomCode, role, selfName, peerName, appo
   const peer = role === 'doctor' ? room?.patient : room?.doctor;
   const peerLabel = role === 'doctor' ? 'patient' : 'doctor';
   const remoteName = peer?.name || peerName || (role === 'doctor' ? 'Patient' : 'Doctor');
+
+  useEffect(() => subscribeRoomApi(setRoomApiOnline), []);
 
   // Publish presence (and keep it fresh) for as long as this room is open.
   useEffect(() => {
@@ -283,6 +302,12 @@ export default function VideoCallRoom({ roomCode, role, selfName, peerName, appo
           </button>
         </div>
       </header>
+
+      {roomApiOnline === false && (
+        <div className="border-b border-amber-400/30 bg-amber-500/15 px-4 py-2 text-center text-[11px] font-semibold text-amber-200 sm:text-xs">
+          Video room server is unreachable. Deploy the rooms service and set VITE_ROOM_API_URL before building.
+        </div>
+      )}
 
       <main className="flex flex-1 items-center justify-center p-4 sm:p-6">
         <div className="relative flex h-full w-full max-w-5xl items-center justify-center overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-[#0B1B3A] via-[#0A1526] to-[#06101F]">

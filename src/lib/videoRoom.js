@@ -1,12 +1,36 @@
-const API_BASE = '/api/demo-rooms';
+const RAW_API_BASE = import.meta.env?.VITE_ROOM_API_URL || '/api/demo-rooms';
+const API_BASE = /^https?:\/\//i.test(RAW_API_BASE)
+  ? RAW_API_BASE.replace(/\/+$/, '')
+  : RAW_API_BASE.startsWith('/')
+    ? RAW_API_BASE.replace(/\/+$/, '')
+    : `https://${RAW_API_BASE.replace(/\/+$/, '')}`;
 const STORAGE_KEY = 'nayacura_video_rooms_v2';
 const LOCAL_EVENT = 'nayacura:video-room';
+const API_EVENT = 'nayacura:room-api';
 const POLL_MS = 1500;
 
 const EMPTY_ROOM = { doctor: null, patient: null };
 const hasWindow = () => typeof window !== 'undefined';
 
 let apiRetryAt = 0;
+let apiOnline = null;
+
+function setApiOnline(value) {
+  if (apiOnline === value) return;
+  apiOnline = value;
+  if (hasWindow()) window.dispatchEvent(new CustomEvent(API_EVENT, { detail: { online: value } }));
+}
+
+export function getRoomApiOnline() {
+  return apiOnline;
+}
+
+export function subscribeRoomApi(callback) {
+  if (!hasWindow()) return () => {};
+  const handler = (event) => callback(event.detail?.online === true);
+  window.addEventListener(API_EVENT, handler);
+  return () => window.removeEventListener(API_EVENT, handler);
+}
 
 /**
  * Both portals need the same room for the same clinician. Dr. Arvind's room keeps
@@ -68,16 +92,32 @@ export function readRoom(roomCode) {
 
 async function request(path, options) {
   if (!hasWindow() || Date.now() < apiRetryAt) return null;
+
+  let response;
   try {
-    const response = await fetch(`${API_BASE}${path}`, {
+    response = await fetch(`${API_BASE}${path}`, {
       cache: 'no-store',
       headers: { 'Content-Type': 'application/json' },
       ...options,
     });
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  } catch {
+    setApiOnline(false);
+    apiRetryAt = Date.now() + 15_000;
+    return null;
+  }
+
+  if (!response.ok) {
+    // 404 / gateway errors usually mean the rooms service is not deployed.
+    setApiOnline(false);
+    apiRetryAt = Date.now() + 15_000;
+    return null;
+  }
+
+  setApiOnline(true);
+  try {
     return await response.json();
   } catch {
-    // The server may be restarting; retry shortly and keep the local room alive.
+    setApiOnline(false);
     apiRetryAt = Date.now() + 15_000;
     return null;
   }
