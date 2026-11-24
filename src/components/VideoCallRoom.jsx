@@ -269,7 +269,7 @@ export default function VideoCallRoom({ roomCode, role, selfName, peerName, appo
   };
 
   return (
-    <div className="fixed inset-0 z-[70] flex h-[100dvh] w-full flex-col overflow-hidden bg-[#050B18] text-white">
+    <div className="fixed inset-0 z-[70] flex w-full flex-col overflow-hidden bg-[#050B18] text-white">
       <header className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-white/10 px-3 py-2.5 sm:gap-3 sm:px-6 sm:py-3">
         <div className="flex items-center gap-3">
           <span className="grid h-9 w-9 place-items-center rounded-full bg-[#16A34A]/15 text-[#4ADE80]">
