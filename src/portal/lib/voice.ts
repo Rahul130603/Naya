@@ -109,6 +109,7 @@ export function speakFemaleVoice(
 ): { stop: () => void } {
   const synth = window.speechSynthesis;
   const lines = speechCaptionLines(cleanSpeechText(rawText));
+  const locale = options.language === 'ta' ? 'ta' : 'en';
   let finished = false;
   let voiceTimer: number | undefined;
 
@@ -125,11 +126,16 @@ export function speakFemaleVoice(
     options.onEnd?.();
   };
 
-  function trySpeak() {
-    if (finished) return;
-    const voice = getBestFemaleVoice(synth.getVoices(), options.language);
-    if (!voice) return;
-    cleanup();
+  const pickVoice = () => {
+    if (!synth) return null;
+    const voices = synth.getVoices();
+    if (!voices.length) return null;
+    return getBestFemaleVoice(voices, options.language)
+      ?? voices.find((voice) => voice.lang.toLowerCase().split(/[-_]/)[0] === locale)
+      ?? voices[0];
+  };
+
+  function speakLines(voice: SpeechSynthesisVoice | null) {
     const speakLine = (index: number) => {
       if (finished) return;
       if (index === lines.length) {
@@ -138,8 +144,12 @@ export function speakFemaleVoice(
       }
       const line = lines[index];
       const utterance = new SpeechSynthesisUtterance(line);
-      utterance.voice = voice;
-      utterance.lang = voice.lang;
+      if (voice) {
+        utterance.voice = voice;
+        utterance.lang = voice.lang;
+      } else {
+        utterance.lang = options.language === 'ta' ? 'ta-IN' : 'en-IN';
+      }
       utterance.pitch = options.pitch ?? 1;
       utterance.rate = options.rate ?? 0.96;
       utterance.onstart = () => {
@@ -157,12 +167,26 @@ export function speakFemaleVoice(
     speakLine(0);
   }
 
+  function trySpeak() {
+    if (finished) return;
+    const voice = pickVoice();
+    // Some browsers populate the voice list asynchronously; wait for voiceschanged.
+    if (!voice && synth && synth.getVoices().length === 0) return;
+    cleanup();
+    speakLines(voice);
+  }
+
   if (!synth || !lines.length) {
     queueMicrotask(() => finish(new Error('Speech playback unavailable')));
   } else {
     synth.cancel();
     synth.addEventListener('voiceschanged', trySpeak);
-    voiceTimer = window.setTimeout(() => finish(new Error('voice-unavailable')), 1200);
+    // If the device exposes no voices at all, speak with the browser default voice.
+    voiceTimer = window.setTimeout(() => {
+      if (finished) return;
+      cleanup();
+      speakLines(null);
+    }, 1800);
     trySpeak();
   }
 

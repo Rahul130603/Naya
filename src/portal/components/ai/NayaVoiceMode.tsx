@@ -158,7 +158,12 @@ export function NayaVoiceMode({
             }
           } catch (error) {
             if (turn.signal.aborted) return;
-            setPermissionError(error instanceof ApiError ? error.message : 'Voice audio could not play.');
+            const status = error instanceof ApiError ? error.status : 0;
+            setPermissionError(
+              status === 503 || status === 404
+                ? 'Voice preview is not available on this deployment — Naya’s reply is saved in the chat.'
+                : 'Voice audio could not play. The reply is available in chat.',
+            );
             resumeListening();
           }
         }
@@ -371,30 +376,30 @@ export function NayaVoiceMode({
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.28, ease: 'easeOut' }}
-        className="naya-voice-overlay fixed inset-0 z-50 flex flex-col items-center justify-between overflow-hidden bg-gradient-to-b from-[#090514] via-[#0b0717] to-[#080512] text-ivory p-6 sm:p-10 select-none"
+        className="naya-voice-overlay fixed inset-0 z-50 flex flex-col items-center justify-between overflow-hidden bg-gradient-to-b from-emerald-50 via-white to-slate-50 text-slate-900 p-6 sm:p-10 select-none"
       >
         {/* Ambient background glow accents */}
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
-          <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[500px] w-[500px] rounded-full bg-blue-600/10 blur-[130px]" />
-          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[350px] w-[350px] rounded-full bg-violet-600/10 blur-[110px]" />
+          <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[500px] w-[500px] rounded-full bg-emerald-300/25 blur-[130px]" />
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-[350px] w-[350px] rounded-full bg-sky-300/20 blur-[110px]" />
         </div>
 
         {/* Top Header */}
         <div className="relative z-10 flex w-full max-w-4xl flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 rounded-full border border-white/[0.08] bg-white/[0.04] px-4 py-1.5 backdrop-blur-md">
-            <Sparkles className="h-4 w-4 text-rose animate-pulse" />
-            <span className="font-serif text-sm font-medium tracking-wide text-ivory">
+          <div className="flex items-center gap-2.5 rounded-full border border-slate-200 bg-white/85 px-4 py-1.5 shadow-sm backdrop-blur-md">
+            <Sparkles className="h-4 w-4 text-[#16A34A]" />
+            <span className="font-serif text-sm font-medium tracking-wide text-[#0B3B82]">
               Naya Voice Mode
             </span>
-            <span className="h-1.5 w-1.5 rounded-full bg-white/20" />
-            <span className="text-xs uppercase tracking-wider text-mauve/80">
+            <span className="h-1.5 w-1.5 rounded-full bg-slate-300" />
+            <span className="text-xs uppercase tracking-wider text-slate-500">
               {language === 'ta' ? 'தமிழ்' : language === 'tanglish' ? 'Tanglish' : 'English Female'}
             </span>
           </div>
 
-          <div className="flex items-center gap-2 text-xs text-mauve/70">
+          <div className="flex items-center gap-2 text-xs text-slate-500">
             {orbState === 'speaking' && (
-              <span className="flex items-center gap-1.5 text-lavender/90">
+              <span className="flex items-center gap-1.5 text-[#0B3B82]">
                 <Volume2 className="h-3.5 w-3.5 animate-pulse" />
                 Tap orb to interrupt
               </span>
@@ -417,14 +422,14 @@ export function NayaVoiceMode({
               state={orbState}
               audioLevel={audioLevel}
               size={340}
-              className="drop-shadow-[0_20px_50px_rgba(59,130,246,0.3)]"
+              className="drop-shadow-[0_20px_50px_rgba(37,99,235,0.18)]"
             />
           </div>
 
           {/* Status Label & Subtitles */}
           <div className="mt-8 min-h-[90px] flex flex-col items-center justify-center space-y-2 max-w-xl">
             {permissionError && (
-              <div className="flex items-center gap-2 rounded-2xl border border-rose/30 bg-rose/10 px-4 py-2.5 text-sm text-rose">
+              <div className="flex items-center gap-2 rounded-2xl border border-red-200 bg-red-50 px-4 py-2.5 text-sm text-red-700">
                 <AlertCircle className="h-4 w-4 shrink-0" />
                 <span>{permissionError}</span>
               </div>
@@ -436,17 +441,17 @@ export function NayaVoiceMode({
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75" />
                     <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-sky-500" />
                   </span>
-                  <span className="text-xs uppercase tracking-widest text-mauve/90 font-medium">
+                  <span className="text-xs uppercase tracking-widest text-slate-600 font-medium">
                     Listening...
                   </span>
                 </div>
-                <p className="text-base sm:text-lg text-ivory/90 font-sans tracking-wide leading-relaxed min-h-[28px]">
+                <p className="text-base sm:text-lg text-slate-800 font-sans tracking-wide leading-relaxed min-h-[28px]">
                   {userTranscript ? (
                     <span>
                       “{userTranscript}”
                     </span>
                   ) : (
-                    <span className="text-mauve/50 italic">
+                    <span className="text-slate-400 italic">
                       Start speaking or ask a question about intimacy, health, or specialists...
                     </span>
                   )}
@@ -459,11 +464,11 @@ export function NayaVoiceMode({
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-purple-400 opacity-75" />
                     <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-purple-500" />
                   </span>
-                  <span className="text-xs uppercase tracking-widest text-lavender font-medium">
+                  <span className="text-xs uppercase tracking-widest text-[#0B3B82] font-medium">
                     Understanding & Thinking...
                   </span>
                 </div>
-                <p className="text-sm text-mauve/70 italic">
+                <p className="text-sm text-slate-500 italic">
                   Reflecting on guidance for you...
                 </p>
               </>
@@ -478,12 +483,12 @@ export function NayaVoiceMode({
                     Naya is speaking
                   </span>
                 </div>
-                <p className="text-base sm:text-lg text-ivory font-serif break-words tracking-wide leading-relaxed">
+                <p className="text-base sm:text-lg text-slate-900 font-serif break-words tracking-wide leading-relaxed">
                   “{assistantSubtitle}”
                 </p>
               </>
             ) : (
-              <div className="text-xs uppercase tracking-widest text-mauve/60">
+              <div className="text-xs uppercase tracking-widest text-slate-500">
                 {isMuted ? 'Microphone Muted' : 'Ready'}
               </div>
             )}
@@ -492,19 +497,19 @@ export function NayaVoiceMode({
 
         {/* Bottom Bar — ChatGPT Voice Pill Design */}
         <div className="relative z-10 w-full max-w-lg mb-2">
-          <div className="flex items-center justify-between rounded-full border border-white/[0.15] bg-white/[0.08] backdrop-blur-2xl px-5 py-3 shadow-[0_15px_35px_rgba(0,0,0,0.5)] transition-all">
+          <div className="flex items-center justify-between rounded-full border border-slate-200 bg-white/95 backdrop-blur-2xl px-5 py-3 shadow-[0_15px_35px_rgba(15,23,42,0.12)] transition-all">
             {/* + Type button (exits voice mode and focuses text chat) */}
             <button
               type="button"
               onClick={onClose}
-              className="group flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium text-white/80 hover:bg-white/10 hover:text-white transition-all"
+              className="group flex items-center gap-2 rounded-full px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-all"
             >
               <Plus className="h-4 w-4 transition-transform group-hover:rotate-90" />
               <span>Type</span>
             </button>
 
             {/* Status indicator in middle */}
-            <div className="hidden sm:flex items-center gap-2 text-xs font-medium text-white/70">
+            <div className="hidden sm:flex items-center gap-2 text-xs font-medium text-slate-500">
               <span
                 className={`h-2 w-2 rounded-full ${
                   orbState === 'listening'
@@ -513,7 +518,7 @@ export function NayaVoiceMode({
                     ? 'bg-purple-400 animate-pulse'
                     : orbState === 'speaking'
                     ? 'bg-rose animate-pulse'
-                    : 'bg-white/30'
+                    : 'bg-slate-300'
                 }`}
               />
               <span className="capitalize">{orbState}</span>
@@ -527,8 +532,8 @@ export function NayaVoiceMode({
                 onClick={toggleMute}
                 className={`grid h-10 w-10 place-items-center rounded-full transition-all ${
                   isMuted
-                    ? 'bg-rose/20 text-rose border border-rose/30'
-                    : 'bg-white/10 hover:bg-white/20 text-white/90'
+                    ? 'bg-red-50 text-red-600 border border-red-200'
+                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
                 }`}
                 title={isMuted || orbState === 'idle' ? 'Start microphone' : 'Mute microphone'}
               >
