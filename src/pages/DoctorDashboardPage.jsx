@@ -141,11 +141,15 @@ export default function DoctorDashboardPage({ user, onLogout }) {
 
   // Live video room: patient presence arrives from the patient portal.
   const roomCode = roomCodeFor(doctor.name);
-  const { room: videoRoom, patientPresent, bothPresent } = useVideoRoom(roomCode);
+  const { room: videoRoom, patientPresent, bothPresent, status: videoStatus } = useVideoRoom(roomCode);
   const [isCallOpen, setIsCallOpen] = useState(false);
   const [dismissedPatientJoin, setDismissedPatientJoin] = useState(null);
   const waitingPatient = patientsQueue[0];
   const patientJoinedAt = videoRoom?.patient?.joinedAt || null;
+  const videoCompleted = videoStatus === 'completed' && !patientPresent;
+  const completedAtLabel = videoRoom?.completedAt
+    ? new Date(videoRoom.completedAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })
+    : '';
   const showPatientRoomToast = Boolean(patientJoinedAt) && !isCallOpen && dismissedPatientJoin !== patientJoinedAt;
 
   // Prescriptions list
@@ -247,13 +251,13 @@ export default function DoctorDashboardPage({ user, onLogout }) {
       )}
 
       {/* 1. PERSISTENT LEFT SIDEBAR */}
-      <aside className={`fixed inset-y-0 left-0 z-50 flex w-[280px] flex-col justify-between border-r border-[#E1E7EF] bg-white transition-transform duration-200 h-screen sticky top-0 shrink-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
+      <aside className={`app-sidebar fixed inset-y-0 left-0 z-50 flex w-[280px] flex-col justify-between border-r border-[#E1E7EF] bg-white transition-transform duration-200 lg:sticky lg:top-0 shrink-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
         
         {/* Top: Logo & Main Navigation Links */}
         <div className="flex flex-col flex-1 min-h-0">
           <div className="flex h-[74px] items-center justify-between border-b border-[#E1E7EF] px-6 shrink-0">
             <Link to="/" aria-label="Nayacura home">
-              <img src="/logo.png" alt="Nayacura" className="h-9 w-auto object-contain cursor-pointer hover:opacity-85 transition" />
+              <img src="/logo.png" alt="Nayacura" className="h-10 sm:h-14 w-auto object-contain cursor-pointer hover:opacity-85 transition" />
             </Link>
             <button
               type="button"
@@ -322,7 +326,7 @@ export default function DoctorDashboardPage({ user, onLogout }) {
             </button>
             <div className="min-w-0">
               <p className="text-[11px] font-extrabold uppercase tracking-widest text-slate-400">Doctor Portal</p>
-              <h2 className="truncate text-xl font-extrabold text-[#0B3B82] sm:text-2xl">
+              <h2 className="truncate text-lg font-extrabold text-[#0B3B82] sm:text-2xl">
                 {SECTION_TITLES[activeSection] || 'Dashboard Overview'}
               </h2>
             </div>
@@ -740,15 +744,13 @@ export default function DoctorDashboardPage({ user, onLogout }) {
                           <span className="text-xs font-bold text-[#0B3B82] block">Instant Video Care Status</span>
                           <span className="text-[11px] text-slate-500">Allow verified patients to request instant video triage</span>
                         </div>
-                        <button
-                          type="button"
-                          onClick={() => setIsAcceptingInstantCalls(!isAcceptingInstantCalls)}
-                          className={`w-12 h-6 rounded-full transition-colors relative shrink-0 ${
+                        <button type="button" role="switch" aria-checked={isAcceptingInstantCalls} aria-label="Accept instant video consults" onClick={() => setIsAcceptingInstantCalls(!isAcceptingInstantCalls)}
+                          className={`toggle-switch w-11 h-6 rounded-full transition-colors relative shrink-0 flex items-center ${
                             isAcceptingInstantCalls ? 'bg-[#16A34A]' : 'bg-slate-300'
                           }`}
                         >
                           <span className={`block w-5 h-5 rounded-full bg-white shadow-xs transition-transform transform ${
-                            isAcceptingInstantCalls ? 'translate-x-6' : 'translate-x-0.5'
+                            isAcceptingInstantCalls ? 'translate-x-5' : 'translate-x-0.5'
                           }`} />
                         </button>
                       </div>
@@ -760,14 +762,14 @@ export default function DoctorDashboardPage({ user, onLogout }) {
                     </div>
                   </div>
 
-                  <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between text-xs">
+                  <div className="mt-6 pt-4 border-t border-slate-100 flex flex-col gap-2 text-xs sm:flex-row sm:items-center sm:justify-between">
                     <span className="text-slate-500">
                       Next available slot: <strong>Tomorrow 10:30 AM</strong>
                     </span>
                     <button
                       type="button"
                       onClick={() => handleNavClick('schedule')}
-                      className="font-bold text-[#0B3B82] hover:text-[#16A34A] transition"
+                      className="self-start font-bold text-[#0B3B82] hover:text-[#16A34A] transition sm:self-auto"
                     >
                       Manage Practice Calendar →
                     </button>
@@ -819,6 +821,11 @@ export default function DoctorDashboardPage({ user, onLogout }) {
                         }`}>
                           {patient.type === 'clinic' ? '📍 In-Clinic' : '💻 Telehealth Video'}
                         </span>
+                        {patient.name === waitingPatient?.name && videoCompleted && (
+                          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-[#128D28] border border-emerald-200">
+                            ✓ Completed
+                          </span>
+                        )}
                       </div>
                       <p className="text-xs text-slate-600">
                         <strong>Chief Complaint:</strong> {patient.chiefComplaint}
@@ -856,7 +863,7 @@ export default function DoctorDashboardPage({ user, onLogout }) {
                           className="px-5 py-2 rounded-xl bg-[#16A34A] hover:bg-[#15803D] text-white text-xs font-bold transition shadow-xs flex items-center gap-1.5"
                         >
                           <Video className="h-3.5 w-3.5" />
-                          <span>Start Video</span>
+                          <span>{videoCompleted ? 'Rejoin' : 'Start Video'}</span>
                         </button>
                       )}
                     </div>
@@ -870,58 +877,68 @@ export default function DoctorDashboardPage({ user, onLogout }) {
           {activeSection === 'video' && (
             <div className="space-y-5 animate-fade-in">
               <div className="p-6 rounded-2xl bg-white border border-[#DCE7F6] shadow-sm">
-                <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+                <div className="flex flex-col gap-2 pb-4 border-b border-slate-100 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <h3 className="text-lg font-extrabold text-[#0B3B82]">HD Video Consultation Suite</h3>
                     <p className="text-xs text-slate-500 mt-1">256-Bit HIPAA Encrypted LiveKit WebRTC Peer-to-Peer Teleconsultation Room</p>
                   </div>
-                  <span className={`px-3 py-1 rounded-full text-xs font-extrabold border ${bothPresent ? 'bg-emerald-50 text-[#16A34A] border-emerald-200' : patientPresent ? 'bg-amber-50 text-amber-700 border-amber-200' : 'bg-slate-50 text-slate-500 border-slate-200'}`}>
-                    {bothPresent ? 'Both Connected' : patientPresent ? 'Patient In Room' : 'Waiting for Patient'}
+                  <span className={`self-start px-3 py-1 rounded-full text-xs font-extrabold border ${bothPresent || patientPresent ? 'bg-emerald-50 text-[#16A34A] border-emerald-200' : videoCompleted ? 'bg-slate-100 text-slate-600 border-slate-200' : 'bg-amber-50 text-amber-700 border-amber-200'}`}>
+                    {bothPresent ? 'Both Connected' : patientPresent ? 'Patient In Room' : videoCompleted ? 'Completed' : 'Waiting for Patient'}
                   </span>
                 </div>
 
                 <div className="mt-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
                   {/* Left: Video Preview Window */}
-                  <div className="lg:col-span-2 aspect-video bg-slate-900 rounded-2xl relative overflow-hidden flex flex-col items-center justify-center p-6 text-white border border-slate-800">
-                    {patientPresent ? (
-                      <>
-                        <div className="w-16 h-16 rounded-full bg-[#16A34A] flex items-center justify-center text-xl font-bold mb-3">
-                          {(waitingPatient?.name || 'P').charAt(0)}
-                        </div>
-                        <p className="font-extrabold text-base">{waitingPatient?.name || 'Patient'}</p>
-                        <p className="text-xs text-slate-400 mt-1">{bothPresent ? 'Patient is connected' : 'Patient is waiting in the room'}</p>
-                      </>
-                    ) : (
-                      <>
-                        <div className="w-16 h-16 rounded-full bg-[#0B3B82] flex items-center justify-center text-xl font-bold mb-3">
-                          {doctor.name.charAt(4)}
-                        </div>
-                        <p className="font-extrabold text-base">{doctor.name}</p>
-                        <p className="text-xs text-slate-400 mt-1">{doctor.specialty} (Ready)</p>
-                      </>
-                    )}
+                  <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 text-white lg:col-span-2">
+                    <div className="relative flex min-h-[230px] flex-col items-center justify-center gap-1 p-6 pt-12 sm:min-h-[300px] lg:aspect-video lg:min-h-0">
+                      {patientPresent ? (
+                        <>
+                          <div className="mb-2 flex h-16 w-16 items-center justify-center rounded-full bg-[#16A34A] text-xl font-bold">
+                            {(waitingPatient?.name || 'P').charAt(0)}
+                          </div>
+                          <p className="font-extrabold text-base">{waitingPatient?.name || 'Patient'}</p>
+                          <p className="text-xs text-slate-400">{bothPresent ? 'Patient is connected' : 'Patient is waiting in the room'}</p>
+                        </>
+                      ) : videoCompleted ? (
+                        <>
+                          <div className="mb-2 flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400">
+                            <CheckCircle2 className="h-8 w-8" />
+                          </div>
+                          <p className="font-extrabold text-base">Consultation completed</p>
+                          <p className="text-center text-xs text-slate-400">{completedAtLabel ? `Session closed at ${completedAtLabel}` : 'Session closed'}</p>
+                        </>
+                      ) : (
+                        <>
+                          <div className="mb-2 flex h-16 w-16 items-center justify-center rounded-full bg-[#0B3B82] text-xl font-bold">
+                            {doctor.name.charAt(4)}
+                          </div>
+                          <p className="font-extrabold text-base">{doctor.name}</p>
+                          <p className="text-xs text-slate-400">{doctor.specialty} (Ready)</p>
+                        </>
+                      )}
 
-                    <div className="absolute top-4 left-4 flex items-center gap-2">
-                      <span className="px-2.5 py-1 rounded-md bg-black/60 text-[10px] font-bold text-emerald-400 flex items-center gap-1">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                        HD 1080p WebRTC
-                      </span>
-                      <span className="px-2.5 py-1 rounded-md bg-black/60 text-[10px] font-bold text-slate-300">
-                        Room #{roomCode}
-                      </span>
+                      <div className="absolute left-3 top-3 flex flex-wrap items-center gap-2 pr-3 sm:left-4 sm:top-4">
+                        <span className="flex items-center gap-1 rounded-md bg-black/60 px-2.5 py-1 text-[10px] font-bold text-emerald-400">
+                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                          HD 1080p WebRTC
+                        </span>
+                        <span className="rounded-md bg-black/60 px-2.5 py-1 text-[10px] font-bold text-slate-300">
+                          Room #{roomCode}
+                        </span>
+                      </div>
                     </div>
 
-                    <div className="absolute bottom-4 inset-x-4 flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex flex-col gap-3 border-t border-white/10 bg-slate-950/40 p-4 sm:flex-row sm:items-center sm:justify-between">
                       <span className="text-[11px] text-slate-400">
-                        {bothPresent ? 'Connected — consultation in progress' : patientPresent ? 'Patient is waiting — join the room' : 'Waiting for patient to connect audio/video...'}
+                        {bothPresent ? 'Connected — consultation in progress' : patientPresent ? 'Patient is waiting — join the room' : videoCompleted ? 'Consultation completed — rejoin if needed' : 'Waiting for patient to connect audio/video...'}
                       </span>
                       <button
                         type="button"
                         onClick={() => setIsCallOpen(true)}
-                        className="px-5 py-2.5 rounded-xl bg-[#16A34A] hover:bg-[#15803D] text-white text-xs font-bold transition shadow-lg flex items-center gap-2"
+                        className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-[#16A34A] px-5 py-2.5 text-xs font-bold text-white shadow-lg transition hover:bg-[#15803D] sm:w-auto"
                       >
                         <Video className="h-4 w-4" />
-                        {bothPresent ? 'Rejoin Room' : 'Join Room'}
+                        {bothPresent || videoCompleted ? 'Rejoin Room' : 'Join Room'}
                       </button>
                     </div>
                   </div>
@@ -933,9 +950,9 @@ export default function DoctorDashboardPage({ user, onLogout }) {
                       <p className="font-extrabold text-slate-800 text-sm">{waitingPatient?.name || 'Suresh Kumar'}</p>
                       <p className="text-xs text-slate-500">Scheduled: 04:30 PM • 30 mins slot</p>
                       <p className="text-xs text-slate-600 mt-2"><strong>Complaint:</strong> Performance Anxiety & Vitality</p>
-                      <p className={`mt-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${patientPresent ? 'bg-emerald-100 text-[#15803D]' : 'bg-slate-200 text-slate-600'}`}>
-                        <span className={`h-1.5 w-1.5 rounded-full ${patientPresent ? 'bg-emerald-500 animate-pulse' : 'bg-slate-400'}`} />
-                        {bothPresent ? 'Both in room — connected' : patientPresent ? 'Patient in the waiting room' : 'Waiting for patient'}
+                      <p className={`mt-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${patientPresent ? 'bg-emerald-100 text-[#15803D]' : videoCompleted ? 'bg-slate-100 text-slate-600' : 'bg-slate-200 text-slate-600'}`}>
+                        <span className={`h-1.5 w-1.5 rounded-full ${patientPresent ? 'bg-emerald-500 animate-pulse' : videoCompleted ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                        {bothPresent ? 'Both in room — connected' : patientPresent ? 'Patient in the waiting room' : videoCompleted ? 'Consultation completed' : 'Waiting for patient'}
                       </p>
                     </div>
 
@@ -992,7 +1009,7 @@ export default function DoctorDashboardPage({ user, onLogout }) {
 
               {/* Prescriptions History Table */}
               <div className="rounded-2xl bg-white border border-[#DCE7F6] shadow-sm overflow-hidden">
-                <div className="p-4 bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-600 grid grid-cols-12 gap-2">
+                <div className="hidden sm:grid grid-cols-12 gap-2 p-4 bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-600">
                   <span className="col-span-3">Patient & ID</span>
                   <span className="col-span-4">Formulation & Dosage</span>
                   <span className="col-span-2">Date & Duration</span>
@@ -1001,20 +1018,20 @@ export default function DoctorDashboardPage({ user, onLogout }) {
 
                 <div className="divide-y divide-slate-100">
                   {prescriptions.map((rx) => (
-                    <div key={rx.id} className="p-4 text-xs grid grid-cols-12 gap-2 items-center hover:bg-slate-50/60 transition">
-                      <div className="col-span-3">
+                    <div key={rx.id} className="grid grid-cols-1 items-start gap-3 p-4 text-xs transition hover:bg-slate-50/60 sm:grid-cols-12 sm:items-center sm:gap-2">
+                      <div className="sm:col-span-3">
                         <p className="font-extrabold text-slate-800">{rx.patientName}</p>
                         <p className="text-[11px] text-slate-500">{rx.id} • {rx.patientId}</p>
                       </div>
-                      <div className="col-span-4">
+                      <div className="sm:col-span-4">
                         <p className="font-bold text-[#0B3B82]">{rx.drug}</p>
                         <p className="text-[11px] text-slate-500">{rx.instructions}</p>
                       </div>
-                      <div className="col-span-2">
+                      <div className="flex items-center gap-3 sm:col-span-2 sm:block">
                         <p className="font-medium text-slate-700">{rx.date}</p>
                         <p className="text-[11px] text-slate-500">{rx.duration}</p>
                       </div>
-                      <div className="col-span-3 text-right space-y-1">
+                      <div className="flex flex-wrap items-center gap-2 sm:col-span-3 sm:block sm:text-right">
                         <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
                           rx.status.includes('DISPATCHED') || rx.status.includes('SIGNED')
                             ? 'bg-emerald-50 text-[#16A34A] border border-emerald-200'
@@ -1023,11 +1040,11 @@ export default function DoctorDashboardPage({ user, onLogout }) {
                           {rx.status}
                         </span>
                         {rx.status === 'REFILL REQUEST' && (
-                          <div>
+                          <div className="sm:mt-1">
                             <button
                               type="button"
                               onClick={() => handleApproveRefill(rx.id)}
-                              className="px-3 py-1 rounded-lg bg-[#16A34A] text-white text-[11px] font-bold hover:bg-[#15803D] transition ml-auto"
+                              className="px-3 py-1.5 rounded-lg bg-[#16A34A] text-white text-[11px] font-bold hover:bg-[#15803D] transition sm:ml-auto"
                             >
                               Approve Refill
                             </button>
@@ -1049,12 +1066,12 @@ export default function DoctorDashboardPage({ user, onLogout }) {
                   <h3 className="text-lg font-extrabold text-[#0B3B82]">Electronic Medical Records (EMR)</h3>
                   <p className="text-xs text-slate-500 mt-1">NABL Accredited diagnostic reports, STI screens, and endocrine blood profiles.</p>
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
                   <span className="text-xs font-bold text-slate-500">Selected Patient:</span>
                   <select
                     value={selectedEmrPatient}
                     onChange={(e) => setSelectedEmrPatient(e.target.value)}
-                    className="px-3 py-1.5 rounded-xl border border-slate-300 text-xs font-bold text-[#0B3B82] bg-white focus:outline-none"
+                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold text-[#0B3B82] bg-white focus:outline-none sm:w-auto sm:py-1.5"
                   >
                     <option value="PT-9410">Suresh Kumar (PT-9410)</option>
                     <option value="PT-9418">Anonymous Patient #812 (PT-9418)</option>
@@ -1065,7 +1082,7 @@ export default function DoctorDashboardPage({ user, onLogout }) {
 
               {/* Diagnostics Detail Card */}
               <div className="p-6 rounded-2xl bg-white border border-[#DCE7F6] shadow-sm space-y-6">
-                <div className="flex items-center justify-between pb-4 border-b border-slate-200">
+                <div className="flex flex-col gap-3 pb-4 border-b border-slate-200 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
                       NABL & CAP Accredited Laboratory
@@ -1073,7 +1090,7 @@ export default function DoctorDashboardPage({ user, onLogout }) {
                     <h4 className="text-base font-extrabold text-slate-800 mt-1">7-Panel Confidential STI Screen & Hormone Profile</h4>
                     <p className="text-xs text-slate-500">Specimen collected: 21 Nov 2026 • Verified by Pathologist Dr. R. Ramanathan, MD</p>
                   </div>
-                  <span className="px-3 py-1 rounded-full bg-emerald-50 text-[#16A34A] text-xs font-extrabold border border-emerald-200">
+                  <span className="self-start px-3 py-1 rounded-full bg-emerald-50 text-[#16A34A] text-xs font-extrabold border border-emerald-200">
                     ALL NON-REACTIVE (NORMAL)
                   </span>
                 </div>
@@ -1157,17 +1174,18 @@ export default function DoctorDashboardPage({ user, onLogout }) {
                   <h3 className="text-lg font-extrabold text-[#0B3B82]">Practice Schedule & Telehealth Windows</h3>
                   <p className="text-xs text-slate-500 mt-1">Configure appointment slots for in-person clinic and encrypted video calls.</p>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-xs font-bold text-slate-600">Instant Video Consults:</span>
-                  <button
-                    type="button"
-                    onClick={() => setIsAcceptingInstantCalls(!isAcceptingInstantCalls)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 ${
-                      isAcceptingInstantCalls ? 'bg-emerald-50 text-[#16A34A] border border-emerald-200' : 'bg-slate-100 text-slate-500'
+                <div className="flex items-center gap-2">
+                  <span className={`text-xs font-bold ${isAcceptingInstantCalls ? 'text-[#16A34A]' : 'text-slate-500'}`}>
+                    {isAcceptingInstantCalls ? 'ONLINE (Accepting)' : 'OFFLINE'}
+                  </span>
+                  <button type="button" role="switch" aria-checked={isAcceptingInstantCalls} aria-label="Accept instant video consults" onClick={() => setIsAcceptingInstantCalls(!isAcceptingInstantCalls)}
+                    className={`toggle-switch flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                      isAcceptingInstantCalls ? 'bg-[#16A34A]' : 'bg-slate-300'
                     }`}
                   >
-                    <span className={`w-2 h-2 rounded-full ${isAcceptingInstantCalls ? 'bg-[#16A34A]' : 'bg-slate-400'}`} />
-                    <span>{isAcceptingInstantCalls ? 'ONLINE (Accepting)' : 'OFFLINE'}</span>
+                    <span className={`block h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
+                      isAcceptingInstantCalls ? 'translate-x-5' : 'translate-x-0.5'
+                    }`} />
                   </button>
                 </div>
               </div>

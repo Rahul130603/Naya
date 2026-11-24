@@ -1,4 +1,5 @@
 import { createServer } from 'node:http';
+import nodemailer from 'nodemailer';
 
 /**
  * Minimal, dependency-free presence + WebRTC signaling relay for the Nayacura
@@ -20,9 +21,79 @@ const rooms = new Map();
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Headers': 'Content-Type,X-Notify-Token',
   'Access-Control-Max-Age': '86400',
 };
+
+const SMTP_HOST = process.env.SMTP_HOST || '';
+const SMTP_PORT = Number(process.env.SMTP_PORT || 587);
+const SMTP_USER = process.env.SMTP_USER || '';
+const SMTP_PASS = process.env.SMTP_PASS || '';
+const SMTP_FROM = process.env.SMTP_FROM || (SMTP_USER ? `Nayacura <${SMTP_USER}>` : '');
+const NOTIFY_TOKEN = process.env.NOTIFY_TOKEN || '';
+const APP_URL = (process.env.APP_URL || 'https://naya-syft.onrender.com').replace(/\/+$/, '');
+const SMTP_CONFIGURED = Boolean(SMTP_HOST && SMTP_USER && SMTP_PASS && NOTIFY_TOKEN);
+
+let mailTransport = null;
+function getMailTransport() {
+  if (!mailTransport) {
+    mailTransport = nodemailer.createTransport({
+      host: SMTP_HOST,
+      port: SMTP_PORT,
+      secure: SMTP_PORT === 465,
+      auth: { user: SMTP_USER, pass: SMTP_PASS },
+    });
+  }
+  return mailTransport;
+}
+
+const notifyHits = new Map();
+function notifyRateLimited(ip) {
+  const now = Date.now();
+  const entry = notifyHits.get(ip);
+  if (!entry || now > entry.resetAt) {
+    notifyHits.set(ip, { count: 1, resetAt: now + 60 * 60 * 1000 });
+    return false;
+  }
+  entry.count += 1;
+  return entry.count > 20;
+}
+
+function approvalMails({ to, name, doctorId, password, regNo }) {
+  const loginUrl = `${APP_URL}/doctor-login`;
+  const today = new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+  return [
+    {
+      subject: 'Thank you for joining Nayacura as a clinician',
+      body: `Dear ${name},
+
+Thank you for applying to practise on Nayacura. Our clinical governance team has verified your council registration (${regNo}) and approved your application on ${today}.
+
+We are grateful that you have chosen to offer confidential, stigma-free sexual wellness care with us. Your private clinician suite is now active.
+
+A separate email with your login credentials follows this message.
+
+Warm regards,
+Nayacura Clinical Governance Team`,
+    },
+    {
+      subject: 'Your Nayacura clinician account credentials',
+      body: `Dear ${name},
+
+Your Nayacura clinician account is ready.
+
+Doctor ID: ${doctorId}
+Login email: ${to}
+Temporary password: ${password}
+Sign in: ${loginUrl}
+
+Please change your password from Profile & Security after your first login.
+
+Warm regards,
+Nayacura Clinician Onboarding`,
+    },
+  ];
+}
 
 function json(res, status, payload) {
   res.writeHead(status, { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
@@ -55,7 +126,7 @@ function getRoom(code) {
 
   let room = rooms.get(code);
   if (!room) {
-    room = { code, participants: { doctor: null, patient: null }, signals: [], seq: 0, lastActivity: now };
+    room = { code, participants: { doctor: null, patient: null }, signals: [], seq: 0, status: 'waiting', completedAt: null, lastActivity: now };
     rooms.set(code, room);
   }
   return room;
@@ -72,10 +143,13 @@ function prune(room) {
 
 function snapshot(room) {
   prune(room);
+  const bothPresent = Boolean(room.participants.doctor && room.participants.patient);
   return {
     code: room.code,
     doctor: room.participants.doctor,
     patient: room.participants.patient,
+    status: bothPresent ? 'live' : room.status,
+    completedAt: room.completedAt,
     updatedAt: room.lastActivity,
   };
 }
@@ -91,7 +165,54 @@ const server = createServer(async (req, res) => {
   const parts = url.pathname.split('/').filter(Boolean);
 
   if (parts.length === 0 || parts[0] === 'health') {
-    json(res, 200, { status: 'ok', service: 'nayacura-rooms', rooms: rooms.size });
+    json(res, 200, { status: 'ok', service: 'nayacura-rooms', rooms: rooms.size, email: SMTP_CONFIGURED });
+    return;
+  }
+
+  if (req.method === 'POST' && parts[0] === 'notify' && parts[1] === 'doctor-approved' && parts.length === 2) {
+    const clientIp = req.socket.remoteAddress || 'unknown';
+    if (!SMTP_CONFIGURED) {
+      json(res, 503, { sent: false, message: 'Email service is not configured on the server.' });
+      return;
+    }
+    if (req.headers['x-notify-token'] !== NOTIFY_TOKEN) {
+      json(res, 401, { sent: false, message: 'Invalid notification token.' });
+      return;
+    }
+    if (notifyRateLimited(clientIp)) {
+      json(res, 429, { sent: false, message: 'Too many email requests. Try again later.' });
+      return;
+    }
+
+    const payload = await readBody(req);
+    const validEmail = typeof payload?.to === 'string' && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(payload.to);
+    if (!payload || !validEmail || !payload.name || !payload.doctorId || !payload.password) {
+      json(res, 400, { sent: false, message: 'Invalid notification payload.' });
+      return;
+    }
+
+    try {
+      const transport = getMailTransport();
+      const mails = approvalMails({
+        to: payload.to,
+        name: String(payload.name).slice(0, 120),
+        doctorId: String(payload.doctorId).slice(0, 40),
+        password: String(payload.password).slice(0, 60),
+        regNo: String(payload.regNo || '').slice(0, 60),
+      });
+      for (const mail of mails) {
+        await transport.sendMail({
+          from: SMTP_FROM,
+          to: payload.to,
+          subject: mail.subject,
+          text: mail.body,
+        });
+      }
+      json(res, 200, { sent: true, count: mails.length, from: SMTP_FROM });
+    } catch (error) {
+      console.error('approval email delivery failed:', error?.message || error);
+      json(res, 502, { sent: false, message: 'SMTP delivery failed.' });
+    }
     return;
   }
 
@@ -166,6 +287,14 @@ const server = createServer(async (req, res) => {
     }
     room.participants[body.role] = null;
     room.signals = room.signals.filter((signal) => signal.from === body.role);
+    room.lastActivity = Date.now();
+    json(res, 200, { room: snapshot(room) });
+    return;
+  }
+
+  if (action === 'complete') {
+    room.status = 'completed';
+    room.completedAt = Date.now();
     room.lastActivity = Date.now();
     json(res, 200, { room: snapshot(room) });
     return;

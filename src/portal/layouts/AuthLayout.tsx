@@ -10,7 +10,7 @@ export function AuthLayout() {
       <RouteEffects />
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex h-20 max-w-7xl items-center justify-between gap-4 px-5 sm:px-8">
-          <Link to="/" aria-label="Nayacura home"><img src="/logo.png" alt="nayacura" className="h-10 w-auto object-contain" /></Link>
+          <Link to="/" aria-label="Nayacura home"><img src="/logo.png" alt="nayacura" className="h-11 sm:h-14 w-auto object-contain" /></Link>
           <Link to="/" className="inline-flex min-h-11 items-center gap-2 rounded-full border border-slate-200 px-4 text-sm font-semibold text-royal hover:bg-slate-50"><ArrowLeft className="h-4 w-4" /> Back to site</Link>
         </div>
       </header>

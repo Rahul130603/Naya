@@ -53,6 +53,8 @@
     min-width: 0;
   }
   button, select, input:not([type="checkbox"]):not([type="radio"]) { min-height: 44px; }
+  /* Toggles keep their compact pill shape on phones (the 44px touch rule would stretch them). */
+  button.toggle-switch { min-height: 0 !important; }
   main p.text-xs, main p.text-\[11px\] { font-size: 14px; line-height: 1.65; }
   .grid > *, .flex-1 { min-width: 0; }
   .hero-cta-magnet { width: 100%; max-width: 320px; }
@@ -209,6 +211,36 @@ html.ai-chat-page-active body {
 /* Keep hero actions still for keyboard navigation and reduced-motion users. */
 .hero-cta-magnet:focus-within > div {
   transform: none !important;
+}
+
+/* Dashboards render inside the global 80% desktop zoom, so viewport units need
+   the inverse scale to reach the real screen edge and keep the profile footer
+   pinned to the bottom of the sidebar. */
+.app-sidebar {
+  height: 100dvh;
+}
+
+@media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+  .app-sidebar {
+    height: 125dvh;
+  }
+}
+
+/* Hero headline reel progress (matches the 5s rotation in HeroSection). */
+@keyframes hero-progress {
+  from { width: 0%; }
+  to { width: 100%; }
+}
+
+.hero-progress-fill {
+  animation: hero-progress 5s linear forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-progress-fill {
+    width: 100%;
+    animation: none;
+  }
 }
 
 @media (prefers-reduced-motion: reduce), (hover: none), (pointer: coarse) {

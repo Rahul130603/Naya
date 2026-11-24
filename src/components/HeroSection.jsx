@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   Search, 
   MapPin, 
@@ -21,6 +21,22 @@ import Magnet from './ui/Magnet';
 import BorderBeam from './ui/BorderBeam';
 import { SPECIALTIES, SYMPTOMS_LIST, DOCTORS } from '../data/healthcareData';
 
+const HERO_HEADLINES = [
+  {
+    first: <>Science-Backed <span className="text-brand-navy">Sexual Wellness</span></>,
+    second: <>Reimagined with <span className="text-brand-navy">naya</span><span className="text-brand-green">cura</span></>,
+  },
+  {
+    first: <>Confidential <span className="text-brand-navy">Sexual Wellness</span></>,
+    second: <>Guided by <span className="text-brand-green">Verified Specialists</span></>,
+  },
+  {
+    first: <>Judgment-Free <span className="text-brand-navy">Intimate Care</span></>,
+    second: <>For Your Body and <span className="text-brand-green">Your Pace</span></>,
+  },
+];
+const HEADLINE_INTERVAL_MS = 5000;
+
 export default function HeroSection({ 
   selectedCity, 
   onSelectSpecialty, 
@@ -31,6 +47,17 @@ export default function HeroSection({
 }) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isFocused, setIsFocused] = useState(false);
+  const [headlineIndex, setHeadlineIndex] = useState(0);
+
+  // Rotate the two-line hero headline like a short looping reel.
+  useEffect(() => {
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+    if (reduceMotion) return undefined;
+    const timer = window.setInterval(() => {
+      setHeadlineIndex((current) => (current + 1) % HERO_HEADLINES.length);
+    }, HEADLINE_INTERVAL_MS);
+    return () => window.clearInterval(timer);
+  }, []);
 
   // Filter recommendations based on search input
   const filteredSpecialties = SPECIALTIES.filter(s => 
@@ -65,9 +92,35 @@ export default function HeroSection({
           </div>
 
           <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-slate-900 leading-tight">
-            Science-Backed <span className="text-brand-navy">Sexual Wellness</span> <br className="hidden sm:inline" />
-            Reimagined with <span className="text-brand-navy">naya</span><span className="text-brand-green">cura</span>
+            <span className="sr-only">Science-Backed Sexual Wellness Reimagined with Nayacura</span>
+            <span aria-hidden="true" className="grid">
+              {HERO_HEADLINES.map((headline, index) => (
+                <span
+                  key={index}
+                  className={`col-start-1 row-start-1 transition-all duration-700 ease-out ${
+                    index === headlineIndex ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-2 opacity-0'
+                  }`}
+                >
+                  {headline.first}
+                  <br className="hidden sm:inline" />{' '}
+                  {headline.second}
+                </span>
+              ))}
+            </span>
           </h1>
+
+          <div aria-hidden="true" className="mx-auto mt-4 flex w-40 items-center gap-1.5">
+            {HERO_HEADLINES.map((_, index) => (
+              <span
+                key={index}
+                className={`relative h-1 flex-1 overflow-hidden rounded-full ${index === headlineIndex ? 'bg-brand-green/25' : 'bg-slate-200'}`}
+              >
+                {index === headlineIndex && (
+                  <span key={headlineIndex} className="hero-progress-fill absolute inset-y-0 left-0 rounded-full bg-brand-green" />
+                )}
+              </span>
+            ))}
+          </div>
 
           <p className="mt-4 text-base sm:text-lg text-slate-600 leading-relaxed">
             Overcome erectile dysfunction, premature ejaculation, low libido, vaginismus and intimate anxiety with verified sexologists, discreet at-home testing, and judgment-free medical care.

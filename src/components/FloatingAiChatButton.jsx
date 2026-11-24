@@ -13,7 +13,7 @@ export default function FloatingAiChatButton() {
   return (
     <aside
       aria-label="Naya AI Chat Assistant"
-      className="fixed bottom-[max(1rem,env(safe-area-inset-bottom))] right-4 sm:bottom-6 sm:right-6 z-40 print:hidden"
+      className="fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom))] right-4 z-40 md:bottom-6 md:right-6 print:hidden"
     >
       <Link
         to="/ai"

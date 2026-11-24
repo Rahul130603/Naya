@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   AlertTriangle,
   Check,
+  CheckCircle2,
   Copy,
   Loader2,
   Mic,
@@ -14,6 +15,7 @@ import {
 } from 'lucide-react';
 import useVideoRoom from '../hooks/useVideoRoom';
 import {
+  completeRoom,
   fetchSignals,
   getRoomApiOnline,
   heartbeatRoom,
@@ -70,8 +72,14 @@ export default function VideoCallRoom({ roomCode, role, selfName, peerName, appo
   const peer = role === 'doctor' ? room?.patient : room?.doctor;
   const peerLabel = role === 'doctor' ? 'patient' : 'doctor';
   const remoteName = peer?.name || peerName || (role === 'doctor' ? 'Patient' : 'Doctor');
+  const roomCompleted = room?.status === 'completed' && !bothPresent;
 
   useEffect(() => subscribeRoomApi(setRoomApiOnline), []);
+
+  const handleEndCall = useCallback(() => {
+    if (bothPresent) completeRoom(roomCode);
+    onClose?.();
+  }, [bothPresent, roomCode, onClose]);
 
   // Publish presence (and keep it fresh) for as long as this room is open.
   useEffect(() => {
@@ -247,7 +255,7 @@ export default function VideoCallRoom({ roomCode, role, selfName, peerName, appo
 
   useEffect(() => {
     const onKeyDown = (event) => {
-      if (event.key === 'Escape') onClose?.();
+      if (event.key === 'Escape') handleEndCall();
     };
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
@@ -256,7 +264,7 @@ export default function VideoCallRoom({ roomCode, role, selfName, peerName, appo
       document.body.style.overflow = previousOverflow;
       window.removeEventListener('keydown', onKeyDown);
     };
-  }, [onClose]);
+  }, [handleEndCall]);
 
   const copyRoomCode = async () => {
     try {
@@ -285,9 +293,15 @@ export default function VideoCallRoom({ roomCode, role, selfName, peerName, appo
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold ${bothPresent ? 'bg-emerald-500/15 text-emerald-300' : 'bg-amber-500/15 text-amber-300'}`}>
-            <span className={`h-1.5 w-1.5 rounded-full ${bothPresent ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}`} />
-            {bothPresent ? `Connected · ${formatDuration(seconds)}` : `Waiting for ${peerLabel}`}
+          <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold ${
+            bothPresent
+              ? 'bg-emerald-500/15 text-emerald-300'
+              : roomCompleted
+                ? 'bg-slate-500/20 text-slate-300'
+                : 'bg-amber-500/15 text-amber-300'
+          }`}>
+            <span className={`h-1.5 w-1.5 rounded-full ${bothPresent ? 'bg-emerald-400' : roomCompleted ? 'bg-slate-400' : 'bg-amber-400 animate-pulse'}`} />
+            {bothPresent ? `Connected · ${formatDuration(seconds)}` : roomCompleted ? 'Consultation completed' : `Waiting for ${peerLabel}`}
           </span>
           <button
             type="button"
@@ -297,7 +311,7 @@ export default function VideoCallRoom({ roomCode, role, selfName, peerName, appo
             {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
             {copied ? 'Copied' : 'Copy room code'}
           </button>
-          <button type="button" aria-label="Close room" onClick={onClose} className="grid h-8 w-8 place-items-center rounded-full border border-white/15 text-slate-300 transition hover:bg-white/10">
+          <button type="button" aria-label="Close room" onClick={handleEndCall} className="grid h-8 w-8 place-items-center rounded-full border border-white/15 text-slate-300 transition hover:bg-white/10">
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -330,6 +344,16 @@ export default function VideoCallRoom({ roomCode, role, selfName, peerName, appo
               </span>
               <p className="max-w-sm text-xs leading-relaxed text-slate-400">
                 You are both in the room. If the video does not appear, check camera permissions on both devices.
+              </p>
+            </div>
+          ) : roomCompleted ? (
+            <div className="relative z-10 flex max-h-full flex-col items-center gap-3 overflow-y-auto px-4 py-6 text-center sm:px-6">
+              <span className="grid h-16 w-16 place-items-center rounded-full bg-emerald-500/15 text-[#4ADE80] sm:h-20 sm:w-20">
+                <CheckCircle2 className="h-7 w-7 sm:h-8 sm:w-8" />
+              </span>
+              <p className="text-base font-bold sm:text-lg">Consultation completed</p>
+              <p className="max-w-sm text-xs leading-relaxed text-slate-400">
+                This session is marked as completed for both {role === 'doctor' ? 'you and the patient' : 'you and the doctor'}. Rejoin any time if you need to continue.
               </p>
             </div>
           ) : (
@@ -384,10 +408,10 @@ export default function VideoCallRoom({ roomCode, role, selfName, peerName, appo
           </button>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleEndCall}
             className="inline-flex h-12 items-center gap-2 rounded-full bg-red-500 px-6 text-sm font-bold text-white transition hover:bg-red-600"
           >
-            <PhoneOff className="h-5 w-5" /> End call
+            <PhoneOff className="h-5 w-5" /> {bothPresent ? 'End & complete' : 'End call'}
           </button>
         </div>
         <p className="mt-2 hidden text-center text-[11px] text-slate-500 sm:mt-3 sm:block">

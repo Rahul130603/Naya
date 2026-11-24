@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { findApplicationByEmail, listAccounts } from '../lib/doctorRegistry';
 import { 
   Lock, 
   LockKeyhole, 
@@ -194,13 +195,58 @@ export default function PatientLoginPage({ onLoginSuccess, currentUser, onLogout
   const handleEmailLogin = (e) => {
     e?.preventDefault();
     setEmailError('');
-    if (!email || !email.includes('@')) {
-      setEmailError('Please enter a valid email address.');
+    const isDoctorIdentifier = selectedRole === 'doctor';
+    if (!email || (!email.includes('@') && !isDoctorIdentifier)) {
+      setEmailError('Please enter a valid email address or your Doctor ID.');
       return;
     }
     if (!password || password.length < 6) {
       setEmailError('Password must be at least 6 characters.');
       return;
+    }
+
+    if (selectedRole === 'doctor') {
+      const identifier = email.trim().toLowerCase();
+      const account = listAccounts().find((item) => (
+        item.email?.toLowerCase() === identifier
+        || item.id?.toLowerCase() === identifier
+        || item.regNo?.toLowerCase() === identifier
+      ));
+
+      if (account) {
+        if (password !== account.password) {
+          setEmailError('Incorrect password. Use the temporary password from your credentials email.');
+          return;
+        }
+        setIsLoading(true);
+        setTimeout(() => {
+          setIsLoading(false);
+          const userObj = {
+            name: account.name,
+            email: account.email,
+            regNo: account.regNo,
+            specialty: account.specialty,
+            role: 'doctor',
+            id: account.id,
+            city: account.city,
+            clinic: 'Nayacura Clinician Console',
+          };
+          if (onLoginSuccess) onLoginSuccess(userObj);
+          setLoginSuccessMessage(`Signed in as ${userObj.name}! Redirecting...`);
+          setTimeout(() => navigate('/doctor-dashboard'), 1000);
+        }, 700);
+        return;
+      }
+
+      const application = findApplicationByEmail(identifier);
+      if (application?.status === 'pending') {
+        setEmailError('Your clinician application is still under review. Credentials arrive by email after approval.');
+        return;
+      }
+      if (application?.status === 'rejected') {
+        setEmailError('This application was not approved. Write to support@nayacura.example for assistance.');
+        return;
+      }
     }
 
     setIsLoading(true);
@@ -357,6 +403,14 @@ export default function PatientLoginPage({ onLoginSuccess, currentUser, onLogout
                 <p className="mt-2 text-sm text-slate-600 leading-relaxed">
                   {currentConfig.subtitle}
                 </p>
+
+                {selectedRole === 'doctor' && (
+                  <div className="mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-purple-200 bg-purple-50/60 px-4 py-3 text-xs font-semibold text-purple-900">
+                    <Stethoscope className="h-4 w-4 text-purple-700" />
+                    <span>New to Nayacura?</span>
+                    <Link to="/doctor-register" className="font-bold underline hover:text-[#0B3B82]">Apply as a clinician →</Link>
+                  </div>
+                )}
 
                 {/* Success Notification */}
                 {loginSuccessMessage && (
@@ -623,6 +677,15 @@ export default function PatientLoginPage({ onLoginSuccess, currentUser, onLogout
                           </>
                         )}
                       </button>
+
+                      {selectedRole === 'doctor' && (
+                        <p className="mt-4 text-center text-xs font-semibold text-slate-500">
+                          New clinician?{' '}
+                          <Link to="/doctor-register" className="font-bold text-[#0B3B82] underline hover:text-[#16A34A]">
+                            Apply for credentials →
+                          </Link>
+                        </p>
+                      )}
                     </form>
                   )}
                 </div>

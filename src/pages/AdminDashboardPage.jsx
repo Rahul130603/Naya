@@ -1,5 +1,15 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
+import {
+  approveApplication,
+  findAccountByEmail,
+  listApplications,
+  listMail,
+  rejectApplication,
+  sendApprovalEmails,
+  subscribeRegistry,
+} from '../lib/doctorRegistry';
+import { getDocument } from '../lib/documentStore';
 import { 
   LayoutDashboard,
   ShieldCheck, 
@@ -26,7 +36,12 @@ import {
   Phone,
   Mail,
   Lock,
-  Database
+  Database,
+  KeyRound,
+  Copy,
+  Check,
+  Stethoscope,
+  BadgeCheck
 } from 'lucide-react';
 
 const SECTION_TITLES = {
@@ -48,7 +63,17 @@ export default function AdminDashboardPage({ user, onLogout }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [selectedDoctorForReview, setSelectedDoctorForReview] = useState(null);
+  const [selectedApplicationForReview, setSelectedApplicationForReview] = useState(null);
   const [adminToast, setAdminToast] = useState(null);
+  const [doctorApplications, setDoctorApplications] = useState(() => listApplications());
+  const [credentialResult, setCredentialResult] = useState(null);
+  const [copiedCredential, setCopiedCredential] = useState(false);
+  const [docPreview, setDocPreview] = useState(null);
+  const [docUrls, setDocUrls] = useState({});
+
+  useEffect(() => subscribeRegistry(() => setDoctorApplications(listApplications())), []);
+
+  const pendingApplications = doctorApplications.filter((application) => application.status === 'pending');
 
   const handleNavClick = (key) => {
     setInternalSection(key);
@@ -159,6 +184,98 @@ export default function AdminDashboardPage({ user, onLogout }) {
     setTimeout(() => setAdminToast(null), 4000);
   };
 
+  const handleApproveApplication = (application) => {
+    setSelectedApplicationForReview(null);
+    const result = approveApplication(application.id);
+    if (!result) return;
+    setDoctorApplications(listApplications());
+    setApprovedDoctors((current) => [{
+      id: result.account.id,
+      name: result.account.name,
+      regNo: result.account.regNo,
+      specialty: result.account.specialty,
+      status: 'VERIFIED & ACTIVE',
+      consultsToday: 0,
+      satisfaction: '100%'
+    }, ...current]);
+    setCopiedCredential(false);
+    setCredentialResult({ ...result, delivery: 'sending' });
+    sendApprovalEmails(result.account).then((status) => {
+      setCredentialResult((current) => (
+        current && current.account?.id === result.account.id
+          ? { ...current, delivery: status.sent ? 'sent' : status.reason }
+          : current
+      ));
+    });
+  };
+
+  const handleRejectApplication = (application) => {
+    setSelectedApplicationForReview(null);
+    rejectApplication(application.id);
+    setDoctorApplications(listApplications());
+    setAdminToast(`Application ${application.id} for ${application.fullName} was rejected.`);
+    setTimeout(() => setAdminToast(null), 3500);
+  };
+
+  const handleViewApplicationEmails = (application) => {
+    const account = findAccountByEmail(application.email);
+    if (!account) return;
+    setCopiedCredential(false);
+    setCredentialResult({
+      account,
+      mails: listMail().filter((mail) => mail.to === application.email),
+      delivery: 'preview',
+    });
+  };
+
+  useEffect(() => {
+    const application = selectedApplicationForReview;
+    if (!application) return undefined;
+
+    let cancelled = false;
+    const created = {};
+    const loadDocuments = async () => {
+      const certificate = await getDocument(`${application.id}:certificate`);
+      if (certificate) created.certificate = URL.createObjectURL(certificate);
+      if (application.cvName) {
+        const cv = await getDocument(`${application.id}:cv`);
+        if (cv) created.cv = URL.createObjectURL(cv);
+      }
+      if (cancelled) {
+        Object.values(created).forEach((url) => URL.revokeObjectURL(url));
+        return;
+      }
+      setDocUrls(created);
+    };
+    loadDocuments();
+
+    return () => {
+      cancelled = true;
+      Object.values(created).forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [selectedApplicationForReview]);
+
+  const closeDocumentPreview = () => {
+    setDocPreview((current) => {
+      if (current?.url) URL.revokeObjectURL(current.url);
+      return null;
+    });
+  };
+
+  const copyCredentials = async () => {
+    if (!credentialResult) return;
+    const { account } = credentialResult;
+    try {
+      await navigator.clipboard?.writeText(
+        `Doctor ID: ${account.id}\nLogin email: ${account.email}\nTemporary password: ${account.password}`,
+      );
+      setCopiedCredential(true);
+      setTimeout(() => setCopiedCredential(false), 2000);
+    } catch {
+      /* clipboard blocked: credentials remain visible on screen */
+    }
+  };
+
   const navItems = [
     { key: 'overview', label: 'Dashboard Overview', icon: LayoutDashboard },
     { key: 'doctors', label: 'Clinician Approvals', icon: UserCheck },
@@ -181,13 +298,13 @@ export default function AdminDashboardPage({ user, onLogout }) {
       )}
 
       {/* 1. PERSISTENT LEFT SIDEBAR */}
-      <aside className={`fixed inset-y-0 left-0 z-50 flex w-[280px] flex-col justify-between border-r border-[#E1E7EF] bg-white transition-transform duration-200 h-screen sticky top-0 shrink-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
+      <aside className={`app-sidebar fixed inset-y-0 left-0 z-50 flex w-[280px] flex-col justify-between border-r border-[#E1E7EF] bg-white transition-transform duration-200 lg:sticky lg:top-0 shrink-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}`}>
         
         {/* Top: Logo & Main Navigation Links */}
         <div className="flex flex-col flex-1 min-h-0">
           <div className="flex h-[74px] items-center justify-between border-b border-[#E1E7EF] px-6 shrink-0">
             <Link to="/" aria-label="Nayacura home">
-              <img src="/logo.png" alt="Nayacura" className="h-9 w-auto object-contain cursor-pointer hover:opacity-85 transition" />
+              <img src="/logo.png" alt="Nayacura" className="h-10 sm:h-14 w-auto object-contain cursor-pointer hover:opacity-85 transition" />
             </Link>
             <button
               type="button"
@@ -256,7 +373,7 @@ export default function AdminDashboardPage({ user, onLogout }) {
             </button>
             <div className="min-w-0">
               <p className="text-[11px] font-extrabold uppercase tracking-widest text-slate-400">Admin Portal</p>
-              <h2 className="truncate text-xl font-extrabold text-[#0B3B82] sm:text-2xl">
+              <h2 className="truncate text-lg font-extrabold text-[#0B3B82] sm:text-2xl">
                 {SECTION_TITLES[activeSection] || 'Dashboard Overview'}
               </h2>
             </div>
@@ -434,7 +551,7 @@ export default function AdminDashboardPage({ user, onLogout }) {
               <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-5">
                 {[
                   { key: 'telehealth', label: 'Total Consults', count: '42', note: 'Completed today', icon: Activity, tone: 'bg-blue-50 text-[#0B3B82]' },
-                  { key: 'doctors', label: 'Doctor Approvals', count: pendingDoctors.length, note: 'Awaiting NMC audit', icon: UserCheck, tone: 'bg-purple-50 text-purple-700' },
+                  { key: 'doctors', label: 'Doctor Approvals', count: pendingDoctors.length + pendingApplications.length, note: 'Awaiting NMC audit', icon: UserCheck, tone: 'bg-purple-50 text-purple-700' },
                   { key: 'logistics', label: 'Plain-Box Dispatch', count: '18', note: 'In transit Blue Dart', icon: Package, tone: 'bg-emerald-50 text-[#128D28]' },
                   { key: 'security', label: 'Security Health', count: '100%', note: 'AES-256 Audited', icon: ShieldCheck, tone: 'bg-amber-50 text-amber-700' },
                 ].map(({ key, label, count, note, icon: Icon, tone }) => (
@@ -517,7 +634,7 @@ export default function AdminDashboardPage({ user, onLogout }) {
                         <h3 className="font-extrabold text-[#0B3B82] text-base">Clinician Credential Verification</h3>
                       </div>
                       <span className="px-3 py-1 rounded-full bg-purple-50 text-purple-700 text-xs font-extrabold border border-purple-200">
-                        {pendingDoctors.length} Awaiting Verification
+                        {pendingDoctors.length + pendingApplications.length} Awaiting Verification
                       </span>
                     </div>
 
@@ -648,9 +765,74 @@ export default function AdminDashboardPage({ user, onLogout }) {
                   <p className="text-xs text-slate-500 mt-1">Review NMC/MCI registration, medical degrees, and approve doctor practice privileges.</p>
                 </div>
                 <span className="px-3 py-1 rounded-full bg-purple-50 text-purple-700 text-xs font-extrabold border border-purple-200">
-                  {pendingDoctors.length} Awaiting Verification
+                  {pendingDoctors.length + pendingApplications.length} Awaiting Verification
                 </span>
               </div>
+
+              {/* New clinician applications submitted from the public form */}
+              {doctorApplications.length > 0 && (
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h4 className="text-xs font-extrabold uppercase tracking-wider text-[#0B3B82]">New clinician applications ({doctorApplications.length})</h4>
+                    <span className="text-[11px] font-semibold text-slate-500">Submitted from the public clinician application form</span>
+                  </div>
+                  {doctorApplications.map((application) => {
+                    const statusStyles = application.status === 'approved'
+                      ? 'bg-emerald-50 text-[#128D28] border-emerald-200'
+                      : application.status === 'rejected'
+                        ? 'bg-red-50 text-red-600 border-red-200'
+                        : 'bg-amber-50 text-amber-700 border-amber-200';
+                    return (
+                      <div key={application.id} className="rounded-2xl border border-[#DCE7F6] bg-white p-5 shadow-xs">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-base font-extrabold text-[#0B3B82]">{application.fullName}</span>
+                              <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-[11px] font-bold text-[#0B3B82]">{application.id}</span>
+                              <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${statusStyles}`}>
+                                {application.status === 'approved' ? `Approved · ${application.doctorId}` : application.status === 'rejected' ? 'Rejected' : 'Pending review'}
+                              </span>
+                            </div>
+                            <p className="mt-1 text-xs text-slate-600">{application.email} · {application.city} · {application.languages}</p>
+                          </div>
+                          <span className="text-[11px] text-slate-500">
+                            {application.submittedAt ? new Date(application.submittedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : ''}
+                          </span>
+                        </div>
+
+                        <div className="mt-3 grid gap-2 break-words text-[11px] text-slate-600 sm:grid-cols-2">
+                          <p><strong>Specialty:</strong> {application.specialty}</p>
+                          <p><strong>Qualification:</strong> {application.qualification}{application.university ? ` · ${application.university}` : ''}</p>
+                          <p><strong>Council:</strong> {application.council} ({application.regNo})</p>
+                          <p><strong>Experience:</strong> {application.experience} years · Graduated {application.graduationYear}</p>
+                          <p className="sm:col-span-2"><strong>Documents:</strong> {application.certificateName}{application.cvName ? ` · ${application.cvName}` : ''}</p>
+                        </div>
+
+                        {application.status === 'pending' ? (
+                          <div className="mt-4 flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-3">
+                            <button type="button" onClick={() => { setDocUrls({}); setSelectedApplicationForReview(application); }} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50">Inspect details</button>
+                            <button type="button" onClick={() => handleRejectApplication(application)} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50">Reject</button>
+                            <button type="button" onClick={() => handleApproveApplication(application)} className="rounded-xl bg-[#16A34A] px-5 py-2 text-xs font-bold text-white hover:bg-[#15803D]">Approve & send credentials</button>
+                          </div>
+                        ) : (
+                          <p className="mt-3 border-t border-slate-100 pt-3 text-[11px] font-semibold text-slate-500">
+                            {application.status === 'approved'
+                              ? `Approval and credentials emails generated for ${application.email}.`
+                              : 'Application rejected — no credentials were issued.'}
+                          </p>
+                        )}
+                        {application.status === 'approved' && (
+                          <div className="mt-2 flex justify-end">
+                            <button type="button" onClick={() => handleViewApplicationEmails(application)} className="rounded-lg border border-[#DCE7F6] px-2.5 py-1.5 text-[11px] font-bold text-[#0B3B82] hover:bg-[#F0F6FF]">
+                              View credentials email
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
 
               {/* Pending Doctors List */}
               <div className="space-y-3">
@@ -964,6 +1146,219 @@ export default function AdminDashboardPage({ user, onLogout }) {
                 Approve & Grant Practice Privileges
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {selectedApplicationForReview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
+          <div className="relative max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl sm:p-7">
+            <button
+              type="button"
+              onClick={() => setSelectedApplicationForReview(null)}
+              aria-label="Close application details"
+              className="absolute right-4 top-4 grid h-8 w-8 place-items-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            <p className="text-[11px] font-extrabold uppercase tracking-widest text-slate-400">Application details</p>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <h3 className="text-lg font-extrabold text-[#0B3B82]">{selectedApplicationForReview.fullName}</h3>
+              <span className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5 text-[11px] font-bold text-[#0B3B82]">{selectedApplicationForReview.id}</span>
+              <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${
+                selectedApplicationForReview.status === 'approved'
+                  ? 'border-emerald-200 bg-emerald-50 text-[#128D28]'
+                  : selectedApplicationForReview.status === 'rejected'
+                    ? 'border-red-200 bg-red-50 text-red-600'
+                    : 'border-amber-200 bg-amber-50 text-amber-700'
+              }`}
+              >
+                {selectedApplicationForReview.status === 'pending' ? 'Pending review' : selectedApplicationForReview.status}
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-[#526987]">
+              Submitted {selectedApplicationForReview.submittedAt ? new Date(selectedApplicationForReview.submittedAt).toLocaleString('en-IN', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}
+            </p>
+
+            <div className="mt-5 grid gap-4 sm:grid-cols-2">
+              <section className="rounded-2xl border border-[#E1E7EF] p-4">
+                <h4 className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-wider text-[#0B3B82]"><UserRound className="h-4 w-4" />Professional profile</h4>
+                <dl className="mt-3 space-y-1.5 text-xs">
+                  <div><dt className="text-[#526987]">Full name</dt><dd className="font-semibold text-[#14213D]">{selectedApplicationForReview.fullName}</dd></div>
+                  <div><dt className="text-[#526987]">Professional email</dt><dd className="font-semibold text-[#14213D]">{selectedApplicationForReview.email}</dd></div>
+                  <div><dt className="text-[#526987]">Contact number</dt><dd className="font-semibold text-[#14213D]">{selectedApplicationForReview.phone || 'Not provided'}</dd></div>
+                  <div><dt className="text-[#526987]">City of practice</dt><dd className="font-semibold text-[#14213D]">{selectedApplicationForReview.city}</dd></div>
+                  <div><dt className="text-[#526987]">Consultation languages</dt><dd className="font-semibold text-[#14213D]">{selectedApplicationForReview.languages}</dd></div>
+                </dl>
+              </section>
+
+              <section className="rounded-2xl border border-[#E1E7EF] p-4">
+                <h4 className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-wider text-[#0B3B82]"><Stethoscope className="h-4 w-4" />Specialty & academics</h4>
+                <dl className="mt-3 space-y-1.5 text-xs">
+                  <div><dt className="text-[#526987]">Primary specialty</dt><dd className="font-semibold text-[#14213D]">{selectedApplicationForReview.specialty}</dd></div>
+                  <div><dt className="text-[#526987]">Highest qualification</dt><dd className="font-semibold text-[#14213D]">{selectedApplicationForReview.qualification}</dd></div>
+                  <div><dt className="text-[#526987]">University / institution</dt><dd className="font-semibold text-[#14213D]">{selectedApplicationForReview.university}</dd></div>
+                  <div><dt className="text-[#526987]">Graduation year</dt><dd className="font-semibold text-[#14213D]">{selectedApplicationForReview.graduationYear}</dd></div>
+                  <div><dt className="text-[#526987]">Years of experience</dt><dd className="font-semibold text-[#14213D]">{selectedApplicationForReview.experience}</dd></div>
+                </dl>
+              </section>
+
+              <section className="rounded-2xl border border-[#E1E7EF] p-4">
+                <h4 className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-wider text-[#0B3B82]"><BadgeCheck className="h-4 w-4" />Council registration</h4>
+                <dl className="mt-3 space-y-1.5 text-xs">
+                  <div><dt className="text-[#526987]">Registration council</dt><dd className="font-semibold text-[#14213D]">{selectedApplicationForReview.council}</dd></div>
+                  <div><dt className="text-[#526987]">Registration / license no.</dt><dd className="font-semibold text-[#14213D]">{selectedApplicationForReview.regNo}</dd></div>
+                </dl>
+              </section>
+
+              <section className="rounded-2xl border border-[#E1E7EF] p-4">
+                <h4 className="flex items-center gap-2 text-xs font-extrabold uppercase tracking-wider text-[#0B3B82]"><FileCheck className="h-4 w-4" />Uploaded documents</h4>
+                <dl className="mt-3 space-y-2 text-xs">
+                  <div>
+                    <dt className="text-[#526987]">Council certificate (PDF)</dt>
+                    <dd className="mt-0.5 flex flex-wrap items-center justify-between gap-2">
+                      <span className="break-all font-semibold text-[#14213D]">{selectedApplicationForReview.certificateName}</span>
+                      {docUrls.certificate ? (
+                        <span className="flex items-center gap-1.5">
+                          <a href={docUrls.certificate} target="_blank" rel="noreferrer" className="rounded-lg bg-[#0B3B82] px-2.5 py-1 text-[11px] font-bold text-white hover:bg-[#082B5E]">View PDF</a>
+                          <button type="button" onClick={() => setDocPreview({ url: docUrls.certificate, name: selectedApplicationForReview.certificateName })} className="rounded-lg border border-[#0B3B82] px-2.5 py-1 text-[11px] font-bold text-[#0B3B82] hover:bg-[#F0F6FF]">Preview here</button>
+                        </span>
+                      ) : (
+                        <span className="text-[11px] text-slate-400">PDF not stored — re-upload required</span>
+                      )}
+                    </dd>
+                  </div>
+                  <div>
+                    <dt className="text-[#526987]">Curriculum vitae (PDF)</dt>
+                    <dd className="mt-0.5 flex flex-wrap items-center justify-between gap-2">
+                      <span className="break-all font-semibold text-[#14213D]">{selectedApplicationForReview.cvName || 'Not uploaded'}</span>
+                      {selectedApplicationForReview.cvName && (
+                        docUrls.cv ? (
+                          <span className="flex items-center gap-1.5">
+                            <a href={docUrls.cv} target="_blank" rel="noreferrer" className="rounded-lg bg-[#0B3B82] px-2.5 py-1 text-[11px] font-bold text-white hover:bg-[#082B5E]">View PDF</a>
+                            <button type="button" onClick={() => setDocPreview({ url: docUrls.cv, name: selectedApplicationForReview.cvName })} className="rounded-lg border border-[#0B3B82] px-2.5 py-1 text-[11px] font-bold text-[#0B3B82] hover:bg-[#F0F6FF]">Preview here</button>
+                          </span>
+                        ) : (
+                          <span className="text-[11px] text-slate-400">PDF not stored — re-upload required</span>
+                        )
+                      )}
+                    </dd>
+                  </div>
+                  <div><dt className="text-[#526987]">Consent declaration</dt><dd className="font-semibold text-[#128D28]">{selectedApplicationForReview.consent ? 'Attested' : 'Not attested'}</dd></div>
+                </dl>
+              </section>
+            </div>
+
+            <div className="mt-6 flex flex-wrap justify-end gap-2 border-t border-slate-100 pt-4">
+              <button type="button" onClick={() => setSelectedApplicationForReview(null)} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50">Close</button>
+              {selectedApplicationForReview.status === 'pending' && (
+                <>
+                  <button type="button" onClick={() => handleRejectApplication(selectedApplicationForReview)} className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-red-600 hover:bg-red-50">Reject application</button>
+                  <button type="button" onClick={() => handleApproveApplication(selectedApplicationForReview)} className="rounded-xl bg-[#16A34A] px-5 py-2 text-xs font-bold text-white hover:bg-[#15803D]">Approve & send credentials</button>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {credentialResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
+          <div className="relative max-h-[92vh] w-full max-w-2xl overflow-y-auto rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl sm:p-7">
+            <button
+              type="button"
+              onClick={() => setCredentialResult(null)}
+              aria-label="Close credentials"
+              className="absolute right-4 top-4 grid h-8 w-8 place-items-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200"
+            >
+              <X className="h-4 w-4" />
+            </button>
+
+            <span className="grid h-12 w-12 place-items-center rounded-full bg-emerald-50 text-[#128D28]">
+              <CheckCircle2 className="h-6 w-6" />
+            </span>
+            <h3 className="mt-3 text-lg font-extrabold text-[#0B3B82]">Clinician approved & credentials issued</h3>
+            <p className="mt-1 text-xs leading-relaxed text-[#526987]">
+              {credentialResult.account.name} can now sign in with these credentials.
+            </p>
+
+            <div className={`mt-3 flex items-start gap-2 rounded-xl border px-3 py-2 text-[11px] font-semibold ${
+              credentialResult.delivery === 'sent'
+                ? 'border-emerald-200 bg-emerald-50 text-[#128D28]'
+                : credentialResult.delivery === 'sending'
+                  ? 'border-blue-200 bg-blue-50 text-[#0B3B82]'
+                  : credentialResult.delivery === 'preview'
+                    ? 'border-slate-200 bg-slate-50 text-slate-600'
+                    : 'border-amber-200 bg-amber-50 text-amber-800'
+            }`}>
+              <Mail className="mt-0.5 h-4 w-4 shrink-0" />
+              <span>
+                {credentialResult.delivery === 'sent' && `Both emails sent from supportnayacura@gmail.com to ${credentialResult.account.email}.`}
+                {credentialResult.delivery === 'sending' && `Sending both emails from supportnayacura@gmail.com to ${credentialResult.account.email}…`}
+                {credentialResult.delivery === 'preview' && 'Preview of the emails that were sent at approval time.'}
+                {credentialResult.delivery === 'not-configured' && 'Email service is not configured yet — showing a preview only. Add SMTP details to the rooms service to deliver real emails.'}
+                {credentialResult.delivery === 'failed' && 'SMTP delivery failed. Verify the Gmail app password and SMTP settings on the rooms service.'}
+                {credentialResult.delivery === 'unreachable' && 'Rooms service unreachable — emails were not sent. Check the service URL and redeploy.'}
+              </span>
+            </div>
+
+            <div className="mt-5 rounded-2xl border border-[#DCE7F6] bg-[#F8FBFF] p-4">
+              <div className="flex items-center justify-between gap-2">
+                <h4 className="flex items-center gap-2 text-sm font-extrabold text-[#0B3B82]"><KeyRound className="h-4 w-4" />Issued credentials</h4>
+                <button
+                  type="button"
+                  onClick={copyCredentials}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-[#DCE7F6] bg-white px-2.5 py-1.5 text-[11px] font-bold text-[#31466A] hover:bg-[#F0F6FF]"
+                >
+                  {copiedCredential ? <Check className="h-3.5 w-3.5 text-[#128D28]" /> : <Copy className="h-3.5 w-3.5" />}
+                  {copiedCredential ? 'Copied' : 'Copy'}
+                </button>
+              </div>
+              <dl className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+                <div><dt className="text-[#526987]">Doctor ID</dt><dd className="font-bold text-[#14213D]">{credentialResult.account.id}</dd></div>
+                <div><dt className="text-[#526987]">Login email</dt><dd className="font-semibold text-[#14213D]">{credentialResult.account.email}</dd></div>
+                <div><dt className="text-[#526987]">Temporary password</dt><dd className="font-mono font-bold text-[#0B3B82]">{credentialResult.account.password}</dd></div>
+                <div><dt className="text-[#526987]">Registration</dt><dd className="font-semibold text-[#14213D]">{credentialResult.account.regNo}</dd></div>
+              </dl>
+            </div>
+
+            <div className="mt-5 space-y-3">
+              <h4 className="flex items-center gap-2 text-sm font-extrabold text-[#0B3B82]"><Mail className="h-4 w-4" />Emails sent</h4>
+              {credentialResult.mails.map((mail) => (
+                <article key={mail.id} className="rounded-2xl border border-[#E1E7EF] bg-white p-4">
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-2">
+                    <p className="text-xs font-bold text-[#14213D]">{mail.subject}</p>
+                    <span className="text-[10px] font-semibold uppercase tracking-wide text-[#526987]">{mail.type === 'thank-you' ? 'Thank you' : 'Credentials'}</span>
+                  </div>
+                  <p className="mt-1 text-[11px] text-[#526987]">To: {mail.to}</p>
+                  <pre className="mt-2 whitespace-pre-wrap font-sans text-[11px] leading-relaxed text-[#31466A]">{mail.body}</pre>
+                </article>
+              ))}
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <button type="button" onClick={() => setCredentialResult(null)} className="rounded-xl bg-[#0B3B82] px-5 py-2.5 text-xs font-bold text-white hover:bg-[#082B5E]">
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {docPreview && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/70 p-2 sm:p-4">
+          <div className="flex h-full w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-slate-200 px-4 py-3">
+              <p className="min-w-0 truncate text-sm font-bold text-[#0B3B82]">{docPreview.name}</p>
+              <div className="flex items-center gap-2">
+                <a href={docPreview.url} target="_blank" rel="noreferrer" className="rounded-lg border border-[#DCE7F6] px-2.5 py-1.5 text-[11px] font-bold text-[#0B3B82] hover:bg-[#F0F6FF]">Open in new tab</a>
+                <button type="button" onClick={closeDocumentPreview} aria-label="Close document preview" className="grid h-8 w-8 place-items-center rounded-full bg-slate-100 text-slate-500 hover:bg-slate-200">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+            <iframe title={docPreview.name} src={docPreview.url} className="min-h-0 w-full flex-1 border-0 bg-slate-100" />
           </div>
         </div>
       )}

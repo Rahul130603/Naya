@@ -18,6 +18,7 @@ import ForSexologistsPage from './pages/ForSexologistsPage';
 import AboutPage from './pages/AboutPage';
 import ContactPage from './pages/ContactPage';
 import PatientLoginPage from './pages/PatientLoginPage';
+import DoctorRegisterPage from './pages/DoctorRegisterPage';
 import PatientDashboardPage from './pages/PatientDashboardPage';
 import DoctorDashboardPage from './pages/DoctorDashboardPage';
 import AdminDashboardPage from './pages/AdminDashboardPage';
@@ -31,6 +32,7 @@ import OrderTrackingModal from './components/OrderTrackingModal';
 import AuthModal from './components/AuthModal';
 import DoctorOnboardingModal from './components/DoctorOnboardingModal';
 import FloatingAiChatButton from './components/FloatingAiChatButton';
+import MobileTabBar from './components/MobileTabBar';
 
 const PortalApp = lazy(() => import('./portal/PortalApp'));
 
@@ -40,6 +42,8 @@ const TODAY_ISO_DATE = new Date().toLocaleDateString('en-CA');
 function WebsiteApp() {
   const location = useLocation();
   const isDashboard = location.pathname.includes('dashboard');
+  const isAuthPage = /^\/(login|patient-login|doctor-login|admin-login|doctor-register|doctor\/register)/.test(location.pathname);
+  const showMobileTabBar = !isDashboard && !isAuthPage;
   const [selectedCity, setSelectedCity] = useState('Chennai');
   const [selectedSpecialty, setSelectedSpecialty] = useState('All');
   const [user, setUser] = useState(() => {
@@ -203,7 +207,7 @@ function WebsiteApp() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-slate-50 font-sans selection:bg-brand-green/20 selection:text-brand-green-dark">
+    <div className={`min-h-screen flex flex-col bg-slate-50 font-sans selection:bg-brand-green/20 selection:text-brand-green-dark ${showMobileTabBar ? 'pb-16 md:pb-0' : ''}`}>
       {/* Global Navigation - hidden on all dashboard portals */}
       {!isDashboard && (
         <Navbar
@@ -332,6 +336,14 @@ function WebsiteApp() {
               />
             } 
           />
+          <Route
+            path="/doctor-register"
+            element={<DoctorRegisterPage />}
+          />
+          <Route
+            path="/doctor/register"
+            element={<DoctorRegisterPage />}
+          />
           <Route 
             path="/admin-login" 
             element={
@@ -442,6 +454,8 @@ function WebsiteApp() {
 
       {/* Footer with full page links */}
       {!isDashboard && <Footer onOpenDoctorOnboarding={() => setIsDoctorOnboardingOpen(true)} />}
+
+      {showMobileTabBar && <MobileTabBar user={user} onBook={() => setIsScheduleModalOpen(true)} />}
 
       {/* Global Interactive Modals */}
       {isScheduleModalOpen && (

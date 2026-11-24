@@ -76,21 +76,21 @@ export default function Navbar({
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6">
         <div className="flex h-16 sm:h-20 items-center justify-between gap-2 xl:gap-4">
           
-          {/* 1. Logo (Left) */}
+          {/* 1. Logo (shifted right + slightly larger) */}
           <Link 
             to="/" 
-            className="flex items-center flex-shrink-0 group focus:outline-none mr-2 xl:mr-4"
+            className="flex items-center flex-shrink-0 group focus:outline-none sm:ml-4 lg:ml-10 mr-2 xl:mr-4"
           >
             <img 
               src="/logo.png" 
               alt="nayacura" 
-              className="h-9 sm:h-10 w-auto object-contain transition-transform group-hover:scale-102"
+              className="h-11 sm:h-14 w-auto object-contain transition-transform group-hover:scale-105"
               onError={(e) => {
                 e.target.style.display = 'none';
                 e.target.nextSibling.style.display = 'flex';
               }}
             />
-            <div className="hidden items-center font-black text-2xl tracking-tight">
+            <div className="hidden items-center font-black text-3xl tracking-tight">
               <span className="text-[#0B3B82]">naya</span>
               <span className="text-[#16A34A]">cura</span>
             </div>

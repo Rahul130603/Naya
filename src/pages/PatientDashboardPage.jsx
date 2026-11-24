@@ -279,6 +279,12 @@ export default function PatientDashboardPage({
     || null;
   const primaryRoomCode = roomCodeFor(nextConsultation?.doctorName || 'Dr. Arvind Swaminathan');
   const { room: primaryRoom, doctorPresent: primaryDoctorPresent } = useVideoRoom(primaryRoomCode);
+  const isPrimaryRoomCompleted = primaryRoom?.status === 'completed';
+  const appointmentStatus = (appointment) => (
+    roomCodeFor(appointment?.doctorName) === primaryRoomCode && isPrimaryRoomCompleted
+      ? 'Completed'
+      : appointment?.status || 'Scheduled'
+  );
   const doctorJoinedAt = primaryRoom?.doctor?.joinedAt || null;
   const [dismissedDoctorJoin, setDismissedDoctorJoin] = useState(null);
   // Notify the patient whenever the doctor is in the room and they are not in the call.
@@ -326,9 +332,9 @@ export default function PatientDashboardPage({
   return (
     <div className="flex min-h-screen bg-[#F5F9FF] text-[#0B234D]">
       {sidebarOpen && <button type="button" aria-label="Close dashboard menu" onClick={() => setSidebarOpen(false)} className="fixed inset-0 z-40 bg-slate-900/40 lg:hidden" />}
-      <aside className={`fixed inset-y-0 left-0 z-50 flex w-[280px] flex-col border-r border-[#E1E7EF] bg-white transition-transform duration-200 lg:sticky lg:top-0 lg:h-screen lg:w-[300px] lg:shrink-0 lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
+      <aside className={`app-sidebar fixed inset-y-0 left-0 z-50 flex w-[280px] flex-col border-r border-[#E1E7EF] bg-white transition-transform duration-200 lg:sticky lg:top-0 lg:w-[300px] lg:shrink-0 lg:translate-x-0 ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}>
         <div className="flex h-[74px] items-center justify-between border-b border-[#E1E7EF] px-6">
-          <Link to="/" aria-label="Nayacura home"><img src="/logo.png" alt="Nayacura" className="h-10 w-auto object-contain" /></Link>
+          <Link to="/" aria-label="Nayacura home"><img src="/logo.png" alt="Nayacura" className="h-10 sm:h-14 w-auto object-contain" /></Link>
           <button type="button" aria-label="Close menu" onClick={() => setSidebarOpen(false)} className="rounded-lg p-2 lg:hidden"><X className="h-5 w-5" /></button>
         </div>
         <nav aria-label="Patient dashboard" className="flex-1 overflow-y-auto px-4 py-6">
@@ -379,7 +385,7 @@ export default function PatientDashboardPage({
             <button type="button" aria-label="Open dashboard menu" onClick={() => setSidebarOpen(true)} className="rounded-lg p-2 hover:bg-slate-100 lg:hidden"><Menu className="h-6 w-6" /></button>
             <div className="min-w-0">
               <p className="text-[11px] font-extrabold uppercase tracking-widest text-slate-400">Patient Portal</p>
-              <h2 className="truncate text-xl font-extrabold text-[#0B3B82] sm:text-2xl">{SECTION_TITLES[activeSection]}</h2>
+              <h2 className="truncate text-lg font-extrabold text-[#0B3B82] sm:text-2xl">{SECTION_TITLES[activeSection]}</h2>
             </div>
           </div>
           <div className="flex items-center gap-3 sm:gap-5">
@@ -536,7 +542,7 @@ export default function PatientDashboardPage({
                 ].map(({ key, label, count, note, icon: Icon, tone }) => (
                   <Link key={key} to={dashboardPath(key)} className="flex min-h-28 items-center gap-3 rounded-2xl border border-[#DCE7F6] bg-white p-4 text-left shadow-sm transition-colors hover:border-[#16A34A] sm:p-5">
                     <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-full ${tone}`}><Icon className="h-5 w-5" /></span>
-                    <span className="min-w-0 flex-1"><span className="block text-xs font-extrabold uppercase tracking-wide text-[#31466A]">{label}</span><span className="block text-2xl font-extrabold text-[#0B3B82]">{count}</span><span className="block truncate text-xs text-[#526987]">{note}</span></span>
+                    <span className="min-w-0 flex-1"><span className="block text-[10px] font-extrabold uppercase leading-tight tracking-wide text-[#31466A] sm:text-xs">{label}</span><span className="block text-2xl font-extrabold text-[#0B3B82]">{count}</span><span className="block truncate text-xs text-[#526987]">{note}</span></span>
                     <ChevronRight className="hidden h-4 w-4 text-[#0B3B82] sm:block" />
                   </Link>
                 ))}
@@ -544,7 +550,7 @@ export default function PatientDashboardPage({
 
               <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
                 <section id="consultation-card" className="rounded-2xl border border-[#DCE7F6] bg-white p-5 shadow-sm">
-                  <div className="flex items-center justify-between gap-3 border-b border-[#E1E7EF] pb-3"><h3 className="flex items-center gap-2 text-base font-extrabold text-[#0B3B82]"><Calendar className="h-5 w-5" />Upcoming Consultation</h3><span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-[#128D28]">{nextConsultation?.status || 'Scheduled'}</span></div>
+                  <div className="flex items-center justify-between gap-3 border-b border-[#E1E7EF] pb-3"><h3 className="flex items-center gap-2 text-base font-extrabold text-[#0B3B82]"><Calendar className="h-5 w-5" />{nextConsultation && appointmentStatus(nextConsultation) === 'Completed' ? 'Last Consultation' : 'Upcoming Consultation'}</h3><span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-[#128D28]">{nextConsultation ? appointmentStatus(nextConsultation) : 'Scheduled'}</span></div>
                   {nextConsultation ? <>
                     <div className="flex flex-wrap items-center justify-between gap-4 py-4">
                       <div className="flex items-center gap-3"><span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-blue-50 font-extrabold text-[#0B3B82]">{nextConsultation.doctorName?.charAt(0) || 'D'}</span><div><p className="font-bold text-[#14213D]">{nextConsultation.doctorName}</p><p className="text-xs text-[#526987]">{nextConsultation.doctorSpecialty}</p><p className="mt-1 text-xs text-[#0B3B82]">{nextConsultation.clinicName}</p></div></div>
@@ -608,7 +614,7 @@ export default function PatientDashboardPage({
                               </div>
                             </div>
                             <div className="text-right">
-                              <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${statusTone(appointment.status)}`}>{appointment.status || 'Scheduled'}</span>
+                              <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${statusTone(appointmentStatus(appointment))}`}>{appointmentStatus(appointment)}</span>
                               <p className="mt-1 text-xs font-bold text-[#0B3B82]">₹{appointment.fee || 0}</p>
                             </div>
                           </div>
@@ -650,7 +656,7 @@ export default function PatientDashboardPage({
                           </p>
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${statusTone(appointment.status)}`}>{appointment.status || 'Scheduled'}</span>
+                          <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${statusTone(appointmentStatus(appointment))}`}>{appointmentStatus(appointment)}</span>
                           {appointment.type === 'video' ? (
                             <button type="button" onClick={() => setCallAppointment(appointment)} className="rounded-lg bg-[#0B3B82] px-3 py-1.5 text-[11px] font-bold text-white">Join Video Call</button>
                           ) : (
@@ -686,6 +692,7 @@ export default function PatientDashboardPage({
                 <div className="grid gap-4 xl:grid-cols-2">
                   {consultations.map((appointment) => {
                     const code = roomCodeFor(appointment.doctorName);
+                    const completed = appointmentStatus(appointment) === 'Completed';
                     const doctorWaiting = code === primaryRoomCode && primaryDoctorPresent;
                     return (
                       <section key={appointment.id} className="rounded-2xl border border-[#DCE7F6] bg-white p-5 shadow-sm">
@@ -697,7 +704,7 @@ export default function PatientDashboardPage({
                               <p className="text-xs text-[#526987]">{appointment.doctorSpecialty}</p>
                             </div>
                           </div>
-                          <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${statusTone(appointment.status)}`}>{appointment.status || 'Scheduled'}</span>
+                          <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${statusTone(appointmentStatus(appointment))}`}>{appointmentStatus(appointment)}</span>
                         </div>
 
                         <div className="mt-4 rounded-xl bg-[#F8FBFF] p-3 text-xs text-[#31466A]">
@@ -707,8 +714,8 @@ export default function PatientDashboardPage({
 
                         <div className="mt-3 flex items-center justify-between gap-2 rounded-xl border border-[#E1E7EF] px-3 py-2 text-[11px] font-semibold">
                           <span className="inline-flex items-center gap-1.5 text-[#31466A]">
-                            <span className={`h-1.5 w-1.5 rounded-full ${doctorWaiting ? 'bg-emerald-500' : 'bg-slate-300'}`} />
-                            {doctorWaiting ? 'Doctor is in the room' : 'Room ready · doctor will be notified'}
+                            <span className={`h-1.5 w-1.5 rounded-full ${completed ? 'bg-emerald-500' : doctorWaiting ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+                            {completed ? 'Consultation completed' : doctorWaiting ? 'Doctor is in the room' : 'Room ready · doctor will be notified'}
                           </span>
                           <span className="text-[#526987]">#{code}</span>
                         </div>
@@ -718,7 +725,7 @@ export default function PatientDashboardPage({
                           onClick={() => { setDismissedDoctorJoin(doctorJoinedAt); setCallAppointment(appointment); }}
                           className="mt-4 w-full rounded-xl bg-[#0B3B82] px-4 py-2.5 text-sm font-bold text-white hover:bg-[#082B5E]"
                         >
-                          Join Room
+                          {completed ? 'Rejoin Room' : 'Join Room'}
                         </button>
                       </section>
                     );
@@ -938,7 +945,7 @@ export default function PatientDashboardPage({
                       aria-checked={useAnonymousAlias}
                       aria-label="Anonymous alias mode"
                       onClick={() => setUseAnonymousAlias(!useAnonymousAlias)}
-                      className={`relative h-6 w-12 shrink-0 rounded-full transition-colors ${useAnonymousAlias ? 'bg-[#16A34A]' : 'bg-slate-300'}`}
+                      className={`toggle-switch relative h-6 w-12 shrink-0 rounded-full transition-colors flex items-center ${useAnonymousAlias ? 'bg-[#16A34A]' : 'bg-slate-300'}`}
                     >
                       <span className={`block h-5 w-5 rounded-full bg-white shadow-xs transition-transform ${useAnonymousAlias ? 'translate-x-6' : 'translate-x-0.5'}`} />
                     </button>
@@ -970,7 +977,7 @@ export default function PatientDashboardPage({
                       aria-checked={useAnonymousAlias}
                       aria-label="Anonymous alias mode"
                       onClick={() => setUseAnonymousAlias(!useAnonymousAlias)}
-                      className={`relative h-6 w-12 shrink-0 rounded-full transition-colors ${useAnonymousAlias ? 'bg-[#16A34A]' : 'bg-slate-300'}`}
+                      className={`toggle-switch relative h-6 w-12 shrink-0 rounded-full transition-colors flex items-center ${useAnonymousAlias ? 'bg-[#16A34A]' : 'bg-slate-300'}`}
                     >
                       <span className={`block h-5 w-5 rounded-full bg-white shadow-xs transition-transform ${useAnonymousAlias ? 'translate-x-6' : 'translate-x-0.5'}`} />
                     </button>

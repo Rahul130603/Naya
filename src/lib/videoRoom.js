@@ -50,6 +50,8 @@ export function roomCodeFor(doctorName = '') {
 const normalize = (room) => ({
   doctor: room?.doctor ? { name: room.doctor.name, joinedAt: room.doctor.joinedAt } : null,
   patient: room?.patient ? { name: room.patient.name, joinedAt: room.patient.joinedAt } : null,
+  status: room?.status === 'completed' ? 'completed' : room?.status === 'live' ? 'live' : 'waiting',
+  completedAt: room?.completedAt || null,
 });
 
 function readCache(roomCode) {
@@ -64,9 +66,9 @@ function readCache(roomCode) {
 
 function sameRoom(a, b) {
   return JSON.stringify([
-    a?.doctor?.name, a?.doctor?.joinedAt, a?.patient?.name, a?.patient?.joinedAt,
+    a?.doctor?.name, a?.doctor?.joinedAt, a?.patient?.name, a?.patient?.joinedAt, a?.status, a?.completedAt,
   ]) === JSON.stringify([
-    b?.doctor?.name, b?.doctor?.joinedAt, b?.patient?.name, b?.patient?.joinedAt,
+    b?.doctor?.name, b?.doctor?.joinedAt, b?.patient?.name, b?.patient?.joinedAt, b?.status, b?.completedAt,
   ]);
 }
 
@@ -152,6 +154,13 @@ export async function leaveRoom(roomCode, role) {
     method: 'POST',
     body: JSON.stringify({ role }),
   });
+}
+
+export async function completeRoom(roomCode) {
+  const current = readCache(roomCode);
+  applyRoom(roomCode, { ...current, status: 'completed', completedAt: Date.now() }, { force: true });
+  const data = await request(`/${encodeURIComponent(roomCode)}/complete`, { method: 'POST', body: '{}' });
+  if (data?.room) applyRoom(roomCode, data.room, { force: true });
 }
 
 export async function sendSignal(roomCode, from, type, payload) {

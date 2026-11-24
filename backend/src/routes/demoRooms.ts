@@ -12,6 +12,8 @@ type Room = {
   participants: Record<Role, Participant | null>;
   signals: Signal[];
   seq: number;
+  status: 'waiting' | 'completed';
+  completedAt: number | null;
   lastActivity: number;
 };
 
@@ -55,10 +57,13 @@ function cleanupRooms() {
 
 function snapshot(room: Room) {
   prune(room);
+  const bothPresent = Boolean(room.participants.doctor && room.participants.patient);
   return {
     code: room.code,
     doctor: room.participants.doctor,
     patient: room.participants.patient,
+    status: bothPresent ? 'live' : room.status,
+    completedAt: room.completedAt,
     updatedAt: room.lastActivity,
   };
 }
@@ -72,6 +77,8 @@ function getRoom(code: string) {
       participants: { doctor: null, patient: null },
       signals: [],
       seq: 0,
+      status: 'waiting',
+      completedAt: null,
       lastActivity: Date.now(),
     };
     rooms.set(code, room);
@@ -132,6 +139,19 @@ demoRoomsRouter.post('/:code/leave', limiter, (req, res) => {
   const room = getRoom(code);
   room.participants[role] = null;
   room.signals = room.signals.filter((signal) => signal.from === role);
+  room.lastActivity = Date.now();
+  res.json({ room: snapshot(room) });
+});
+
+demoRoomsRouter.post('/:code/complete', limiter, (req, res) => {
+  const { code } = req.params;
+  if (!ROOM_CODE.test(code)) {
+    res.status(400).json({ message: 'Invalid room code.' });
+    return;
+  }
+  const room = getRoom(code);
+  room.status = 'completed';
+  room.completedAt = Date.now();
   room.lastActivity = Date.now();
   res.json({ room: snapshot(room) });
 });

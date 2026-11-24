@@ -13,6 +13,7 @@ export default function useVideoRoom(roomCode) {
 
   return {
     room,
+    status: room?.status || 'waiting',
     doctorPresent: Boolean(room?.doctor),
     patientPresent: Boolean(room?.patient),
     bothPresent: Boolean(room?.doctor && room?.patient),

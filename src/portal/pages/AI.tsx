@@ -79,6 +79,24 @@ const suggestionsByLang = {
   ],
 };
 
+const headlinesByLang: Record<ChatLanguage, { first: string; second: string }[]> = {
+  en: [
+    { first: 'Your Space,', second: 'Your Conversation' },
+    { first: 'Ask Freely,', second: 'We Listen Without Judgement' },
+    { first: 'Private Intimate Health,', second: 'Guided by Real Clinicians' },
+  ],
+  ta: [
+    { first: 'உங்கள் தனிப்பட்ட இடம்,', second: 'உங்கள் உரையாடல்' },
+    { first: 'தயக்கமின்றி கேளுங்கள்,', second: 'நாங்கள் அன்புடன் கேட்போம்' },
+    { first: 'ரகசிய பாலியல் நலம்,', second: 'உண்மையான மருத்துவர்களுடன்' },
+  ],
+  tanglish: [
+    { first: 'Unga Space,', second: 'Unga Conversation' },
+    { first: 'Thayakkam Illama Kelunga,', second: 'We Listen, No Judgement' },
+    { first: 'Private Intimate Health,', second: 'Real Doctors Guidance' },
+  ],
+};
+
 function uid() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
@@ -156,6 +174,7 @@ export default function AI() {
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [isListening, setIsListening] = useState(false);
+  const [headlineIndex, setHeadlineIndex] = useState(0);
 
   // Refs
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -334,6 +353,17 @@ export default function AI() {
   );
 
   const hasMessages = messages.length > 0;
+  const headlines = headlinesByLang[language] ?? headlinesByLang.en;
+
+  useEffect(() => {
+    if (hasMessages) return undefined;
+    const reduceMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches;
+    if (reduceMotion) return undefined;
+    const timer = window.setInterval(() => {
+      setHeadlineIndex((current) => (current + 1) % headlines.length);
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [hasMessages, headlines.length]);
 
   useEffect(() => {
     document.documentElement.classList.add('ai-chat-page-active');
@@ -389,7 +419,7 @@ export default function AI() {
                   <img
                     src="/logo.png"
                     alt="Nayacura"
-                    className="h-7 w-auto object-contain"
+                    className="h-10 w-auto object-contain"
                   />
                   <span className="rounded-md bg-emerald-100 text-[#15803D] border border-emerald-200 px-1.5 py-0.5 text-[10px] font-black uppercase tracking-wider">
                     AI
@@ -684,21 +714,37 @@ export default function AI() {
               <div className="flex min-h-full my-auto flex-col items-center justify-center max-w-3xl mx-auto py-8 text-center animate-fade-in">
                 
                 {/* Greeting Title */}
-                <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-[#0B3B82] mb-3">
-                  {language === 'ta' ? (
-                    <>
-                      உங்கள் தனிப்பட்ட இடம், <span className="text-[#16A34A]">உங்கள் உரையாடல்</span>
-                    </>
-                  ) : language === 'tanglish' ? (
-                    <>
-                      Unga Space, <span className="text-[#16A34A]">Unga Conversation</span>
-                    </>
-                  ) : (
-                    <>
-                      Your Space, <span className="text-[#16A34A]">Your Conversation</span>
-                    </>
-                  )}
+                <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-[#0B3B82] mb-2">
+                  <span className="sr-only">
+                    {headlines.map((headline) => `${headline.first} ${headline.second}`).join('. ')}
+                  </span>
+                  <span aria-hidden="true" className="grid">
+                    {headlines.map((headline, index) => (
+                      <span
+                        key={index}
+                        className={`col-start-1 row-start-1 transition-all duration-700 ease-out ${
+                          index === headlineIndex ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-2 opacity-0'
+                        }`}
+                      >
+                        <span className="block text-[#0B3B82]">{headline.first}</span>
+                        <span className="block text-[#16A34A]">{headline.second}</span>
+                      </span>
+                    ))}
+                  </span>
                 </h1>
+
+                <div aria-hidden="true" className="mx-auto mb-5 flex w-36 items-center gap-1.5">
+                  {headlines.map((_, index) => (
+                    <span
+                      key={index}
+                      className={`relative h-1 flex-1 overflow-hidden rounded-full ${index === headlineIndex ? 'bg-[#16A34A]/25' : 'bg-slate-200'}`}
+                    >
+                      {index === headlineIndex && (
+                        <span key={headlineIndex} className="hero-progress-fill absolute inset-y-0 left-0 rounded-full bg-[#16A34A]" />
+                      )}
+                    </span>
+                  ))}
+                </div>
 
                 {/* Subtitle */}
                 <p className="text-sm sm:text-base text-slate-600 font-medium max-w-lg mx-auto mb-8">
