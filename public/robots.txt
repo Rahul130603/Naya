@@ -1,0 +1,15 @@
+User-agent: *
+Allow: /
+
+# Private clinical areas — never index
+Disallow: /patient-dashboard
+Disallow: /doctor-dashboard
+Disallow: /admin-dashboard
+Disallow: /dashboard
+Disallow: /login
+Disallow: /patient-login
+Disallow: /doctor-login
+Disallow: /admin-login
+Disallow: /doctor-register
+
+Sitemap: https://naya-syft.onrender.com/sitemap.xml

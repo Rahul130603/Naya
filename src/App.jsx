@@ -33,6 +33,7 @@ import AuthModal from './components/AuthModal';
 import DoctorOnboardingModal from './components/DoctorOnboardingModal';
 import FloatingAiChatButton from './components/FloatingAiChatButton';
 import MobileTabBar from './components/MobileTabBar';
+import { usePageSeo } from './lib/seo';
 
 const PortalApp = lazy(() => import('./portal/PortalApp'));
 
@@ -41,6 +42,7 @@ const TODAY_ISO_DATE = new Date().toLocaleDateString('en-CA');
 
 function WebsiteApp() {
   const location = useLocation();
+  usePageSeo(location.pathname);
   const isDashboard = location.pathname.includes('dashboard');
   const isAuthPage = /^\/(login|patient-login|doctor-login|admin-login|doctor-register|doctor\/register)/.test(location.pathname);
   const showMobileTabBar = !isDashboard && !isAuthPage;
