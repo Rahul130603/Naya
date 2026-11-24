@@ -269,8 +269,8 @@ export default function VideoCallRoom({ roomCode, role, selfName, peerName, appo
   };
 
   return (
-    <div className="fixed inset-0 z-[70] flex flex-col bg-[#050B18] text-white">
-      <header className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 px-4 py-3 sm:px-6">
+    <div className="fixed inset-0 z-[70] flex h-[100dvh] w-full flex-col overflow-hidden bg-[#050B18] text-white">
+      <header className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-white/10 px-3 py-2.5 sm:gap-3 sm:px-6 sm:py-3">
         <div className="flex items-center gap-3">
           <span className="grid h-9 w-9 place-items-center rounded-full bg-[#16A34A]/15 text-[#4ADE80]">
             <ShieldCheck className="h-5 w-5" />
@@ -304,26 +304,26 @@ export default function VideoCallRoom({ roomCode, role, selfName, peerName, appo
       </header>
 
       {roomApiOnline === false && (
-        <div className="border-b border-amber-400/30 bg-amber-500/15 px-4 py-2 text-center text-[11px] font-semibold text-amber-200 sm:text-xs">
+        <div className="shrink-0 border-b border-amber-400/30 bg-amber-500/15 px-3 py-1.5 text-center text-[11px] font-semibold text-amber-200 sm:px-4 sm:py-2 sm:text-xs">
           Video room server is unreachable. Deploy the rooms service and set VITE_ROOM_API_URL before building.
         </div>
       )}
 
-      <main className="flex flex-1 items-center justify-center p-4 sm:p-6">
-        <div className="relative flex h-full w-full max-w-5xl items-center justify-center overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-br from-[#0B1B3A] via-[#0A1526] to-[#06101F]">
+      <main className="flex min-h-0 flex-1 items-center justify-center p-2 sm:p-4">
+        <div className="relative flex h-full min-h-0 w-full max-w-[1400px] items-center justify-center overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-[#0B1B3A] via-[#0A1526] to-[#06101F] sm:rounded-3xl">
           {remoteStream ? (
             <>
-              <video ref={remoteVideoRef} autoPlay playsInline className="h-full w-full object-contain" />
-              <span className="absolute bottom-4 left-4 rounded-lg bg-black/60 px-2.5 py-1 text-xs font-bold text-white">
+              <video ref={remoteVideoRef} autoPlay playsInline className="absolute inset-0 h-full w-full bg-black object-contain" />
+              <span className="absolute bottom-3 left-3 z-10 max-w-[45%] truncate rounded-lg bg-black/60 px-2.5 py-1 text-xs font-bold text-white sm:bottom-4 sm:left-4">
                 {remoteName}
               </span>
             </>
           ) : bothPresent ? (
-            <div className="flex flex-col items-center gap-3 px-6 text-center">
-              <span className="grid h-24 w-24 place-items-center rounded-full bg-[#16A34A]/20 text-3xl font-extrabold text-[#4ADE80] ring-4 ring-[#16A34A]/20">
+            <div className="relative z-10 flex max-h-full flex-col items-center gap-3 overflow-y-auto px-4 py-6 text-center sm:px-6">
+              <span className="grid h-20 w-20 place-items-center rounded-full bg-[#16A34A]/20 text-3xl font-extrabold text-[#4ADE80] ring-4 ring-[#16A34A]/20 sm:h-24 sm:w-24">
                 {remoteName.charAt(0).toUpperCase()}
               </span>
-              <p className="text-xl font-bold">{remoteName}</p>
+              <p className="text-lg font-bold sm:text-xl">{remoteName}</p>
               <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-3 py-1 text-[11px] font-bold text-amber-300">
                 <Loader2 className="h-3.5 w-3.5 animate-spin" />
                 {pcState === 'connected' ? 'Starting video…' : 'Connecting video…'}
@@ -333,18 +333,18 @@ export default function VideoCallRoom({ roomCode, role, selfName, peerName, appo
               </p>
             </div>
           ) : (
-            <div className="flex flex-col items-center gap-3 px-6 text-center">
-              <span className="grid h-20 w-20 place-items-center rounded-full bg-white/5">
-                <Loader2 className="h-8 w-8 animate-spin text-[#4ADE80]" />
+            <div className="relative z-10 flex max-h-full flex-col items-center gap-3 overflow-y-auto px-4 py-6 text-center sm:px-6">
+              <span className="grid h-16 w-16 place-items-center rounded-full bg-white/5 sm:h-20 sm:w-20">
+                <Loader2 className="h-7 w-7 animate-spin text-[#4ADE80] sm:h-8 sm:w-8" />
               </span>
-              <p className="text-lg font-bold">Waiting for the {peerLabel} to join</p>
+              <p className="text-base font-bold sm:text-lg">Waiting for the {peerLabel} to join</p>
               <p className="max-w-sm text-xs leading-relaxed text-slate-400">
                 Keep this tab open. {remoteName} will appear here the moment they join the room.
               </p>
             </div>
           )}
 
-          <div className="absolute bottom-4 right-4 h-32 w-48 overflow-hidden rounded-2xl border border-white/15 bg-black/60 sm:h-40 sm:w-60">
+          <div className="absolute bottom-3 right-3 z-20 h-24 w-36 overflow-hidden rounded-xl border border-white/15 bg-black/60 sm:bottom-4 sm:right-4 sm:h-40 sm:w-60 sm:rounded-2xl">
             <video ref={videoRef} autoPlay playsInline muted className={`h-full w-full object-cover ${camOn ? '' : 'opacity-0'}`} />
             {!camOn && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-slate-400">
@@ -357,9 +357,9 @@ export default function VideoCallRoom({ roomCode, role, selfName, peerName, appo
         </div>
       </main>
 
-      <footer className="border-t border-white/10 px-4 py-4 sm:px-6">
+      <footer className="shrink-0 border-t border-white/10 px-3 py-3 sm:px-6 sm:py-4">
         {mediaError && (
-          <p className="mb-3 flex items-center justify-center gap-2 text-center text-xs font-semibold text-amber-300">
+          <p className="mb-2 flex items-center justify-center gap-2 text-center text-[11px] font-semibold text-amber-300 sm:mb-3 sm:text-xs">
             <AlertTriangle className="h-4 w-4 shrink-0" />{mediaError}
           </p>
         )}
@@ -390,7 +390,7 @@ export default function VideoCallRoom({ roomCode, role, selfName, peerName, appo
             <PhoneOff className="h-5 w-5" /> End call
           </button>
         </div>
-        <p className="mt-3 text-center text-[11px] text-slate-500">
+        <p className="mt-2 hidden text-center text-[11px] text-slate-500 sm:mt-3 sm:block">
           {pcState === 'connected'
             ? 'Live peer-to-peer video · encrypted media · nothing is recorded.'
             : 'Both devices connect through the room server; video starts automatically once both cameras are available.'}
