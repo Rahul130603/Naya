@@ -1,0 +1,1 @@
+Imported from D:/naya/frontend/src for the Nayacura patient, clinician and administrator portals. Supporting auth, records, booking and consultation flows retain their original API contracts. Portal CSS is built and scoped separately to preserve the existing public website.

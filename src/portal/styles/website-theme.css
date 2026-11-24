@@ -1,0 +1,43 @@
+.naya-portal {
+  --royal: #0b3b82;
+  --burgundy: #072658;
+  --rose: #16a34a;
+  --lavender: #15803d;
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+}
+.naya-portal .display,
+.naya-portal .font-display {
+  font-family: Inter, system-ui, -apple-system, sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+  color: #0b3b82;
+}
+.naya-portal .display-soft {
+  font-style: normal;
+  font-weight: 800;
+  color: #16a34a;
+}
+.naya-portal .input-premium {
+  min-height: 44px;
+  border-radius: 12px;
+  font-size: 14px;
+}
+.naya-portal .label-premium { font-size: 12px; letter-spacing: 0.04em; }
+.naya-portal select option,
+.naya-portal select optgroup { background: #fff; color: #0f172a; }
+.naya-portal .portal-tabs a[aria-current="page"] { background: #0b3b82; border-color: #0b3b82; color: #fff; }
+.naya-portal .portal-login-title { font-size: clamp(28px, 3vw, 36px); }
+.naya-portal .portal-login-title span { display: block; margin-top: 4px; }
+.naya-portal .portal-login-copy { font-size: 14px; line-height: 1.7; }
+.naya-portal .portal-sidebar { background: #fff; }
+.naya-portal .portal-sidebar nav button[aria-current="page"] { background: #eff6ff; color: #0b3b82; }
+.naya-portal .portal-sidebar nav button[aria-current="page"] > span:first-child { background: #0b3b82; color: #fff; border-color: #0b3b82; }
+.naya-portal .portal-sidebar nav button { min-height: 44px; }
+.naya-portal .portal-sidebar nav button:hover { background: #f1f5f9; }
+.naya-portal .portal-tabs a { font-size: 14px; }
+@media (max-width: 639px) {
+  .naya-portal .input-premium { font-size: 16px; }
+}

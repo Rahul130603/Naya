@@ -1,0 +1,219 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.booking-schedule-dialog::backdrop {
+  background: rgb(15 23 42 / 55%);
+  backdrop-filter: blur(4px);
+}
+
+@media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+  .booking-schedule-dialog {
+    /* Compensate viewport units for the document's 80% desktop zoom. */
+    max-height: 112.5dvh;
+  }
+}
+
+@media (min-width: 640px) and (max-width: 1279px) {
+  .mobile-menu { max-height: calc(100dvh - 80px); overflow-y: auto; overscroll-behavior: contain; }
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+  body {
+    @apply bg-slate-50 text-slate-900 antialiased selection:bg-brand-green/20 selection:text-brand-green-dark;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  }
+  #root { min-width: 0; }
+  img, video { max-width: 100%; }
+  button, a, input, select, textarea { touch-action: manipulation; }
+  :focus-visible { outline: 2px solid #0B3B82; outline-offset: 3px; }
+
+  /* Match the compact 80% desktop view (20% zoom out) across all routes and views.
+     Apply once to the document so every route, modal, and workspace shares the scale. */
+  @media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+    html {
+      zoom: 0.8;
+    }
+  }
+}
+
+/* Mobile layout: full-size text inputs avoid focus zoom on iOS. */
+@media (max-width: 767px) {
+  body:has(.store-mobile-cart) aside[aria-label="Naya AI Chat Assistant"] { bottom: 96px; }
+  .storefront:has(.store-mobile-cart) { padding-bottom: 112px; }
+  html { scroll-padding-top: 80px; }
+  body { overflow-wrap: break-word; }
+  input:not([type="checkbox"]):not([type="radio"]), select, textarea {
+    font-size: 16px !important;
+    max-width: 100%;
+    min-width: 0;
+  }
+  button, select, input:not([type="checkbox"]):not([type="radio"]) { min-height: 44px; }
+  main p.text-xs, main p.text-\[11px\] { font-size: 14px; line-height: 1.65; }
+  .grid > *, .flex-1 { min-width: 0; }
+  .hero-cta-magnet { width: 100%; max-width: 320px; }
+  .hero-cta-magnet button, .hero-cta-magnet a { width: 100%; min-height: 48px; font-size: 14px; }
+  .booking-schedule-dialog { width: calc(100% - 16px); max-height: calc(100dvh - 16px); border-radius: 20px; }
+  .app-modal { max-height: calc(100dvh - 24px); }
+  .mobile-menu { max-height: calc(100dvh - 64px); overflow-y: auto; overscroll-behavior: contain; }
+  .mobile-menu a { min-height: 44px; }
+  .phone-preview { width: min(100%, 350px); }
+  .phone-preview .phone-chassis { width: 100%; }
+  footer a { display: inline-flex; align-items: center; min-height: 44px; }
+}
+@media (min-width: 1024px) and (hover: hover) and (pointer: fine) {
+  .app-modal { max-height: 112.5dvh; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+}
+
+/* Custom modern transparent scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35);
+  border-radius: 9999px;
+  border: none !important;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.6);
+}
+
+/* Ensure AI chat workspace has zero white scrollbar seam and no outer window scrolling */
+#ai-workspace ::-webkit-scrollbar-track,
+.naya-portal ::-webkit-scrollbar-track {
+  background: transparent !important;
+}
+
+#ai-workspace ::-webkit-scrollbar-thumb,
+.naya-portal ::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.35) !important;
+  border: none !important;
+}
+
+html.ai-chat-page-active,
+html.ai-chat-page-active body {
+  overflow: hidden !important;
+}
+
+@media (max-width: 1023px), (pointer: coarse) {
+  #ai-workspace {
+    height: var(--naya-mobile-height, 100dvh);
+    top: var(--naya-mobile-top, 0px);
+    bottom: auto;
+  }
+  #ai-workspace button, #ai-workspace header a { min-height: 44px; }
+  #ai-workspace button:has(> svg:only-child) { min-width: 44px; }
+  #ai-workspace input, #ai-workspace textarea { font-size: 16px !important; min-width: 0; }
+  #ai-workspace .ai-message-scroll { scroll-padding-bottom: 16px; }
+  #ai-workspace .ai-composer { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+  #ai-workspace .ai-message-scroll p { overflow-wrap: anywhere; }
+  #ai-workspace .ai-message-scroll pre { max-width: 100%; overflow-x: auto; }
+}
+@media (max-width: 639px) {
+  #ai-workspace .ai-mobile-header { padding: 8px 12px; gap: 4px; }
+  #ai-workspace .ai-header-controls { display: grid; grid-template-columns: minmax(0, 1fr) auto; width: 100%; gap: 6px; }
+  #ai-workspace .ai-header-controls .ai-language-switcher { grid-column: 1 / -1; grid-row: 2; justify-content: center; }
+  #ai-workspace .ai-language-switcher button { flex: 1; }
+  #ai-workspace .ai-header-controls > div:first-child { min-width: 0; }
+  #ai-workspace .ai-header-controls > div:first-child > button { max-width: 100%; }
+  #ai-workspace .ai-header-controls > div:first-child > button > span:nth-child(2) { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #ai-workspace .ai-header-controls > a { min-height: 44px; }
+  #ai-workspace form { gap: 4px; }
+  #ai-workspace form input { padding-left: 0; padding-right: 0; }
+  #ai-workspace .ai-message-scroll > div { width: 100%; padding-top: 16px; padding-bottom: 16px; }
+  #ai-workspace .ai-message-scroll h1 { font-size: clamp(25px, 7vw, 32px); line-height: 1.2; }
+  #ai-workspace .ai-message-scroll p { font-size: 14px; line-height: 1.6; }
+  #naya-chat-sidebar > div { overflow-y: auto; overscroll-behavior: contain; }
+  .naya-voice-overlay { padding: 16px; gap: 16px; overflow-y: auto; }
+  .naya-voice-overlay [data-voice-orb] { width: min(360px, 74vw, 42dvh) !important; height: auto !important; aspect-ratio: 1; }
+  .naya-voice-overlay [data-voice-orb] canvas { width: 100% !important; height: 100% !important; }
+  .naya-voice-overlay .text-ivory { color: #f8fafc; }
+}
+
+/* Modern Card Hover shine effects (ReactBits style) */
+.shine-card {
+  position: relative;
+  overflow: hidden;
+}
+.shine-card::after {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0) 70%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+.shine-card:hover::after {
+  opacity: 1;
+}
+
+/* Glassmorphism */
+.glass-nav {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* React Bits Shiny Text */
+.shiny-text {
+  background: linear-gradient(
+    110deg,
+    #0B3B82 40%,
+    #16A34A 50%,
+    #0B3B82 60%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shine 4s ease-in-out infinite;
+}
+
+.shiny-text-white {
+  background: linear-gradient(
+    110deg,
+    rgba(255, 255, 255, 0.7) 40%,
+    #ffffff 50%,
+    rgba(255, 255, 255, 0.7) 60%
+  );
+  background-size: 200% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: shine 3.5s ease-in-out infinite;
+}
+
+/* Pause marquee on hover */
+@media (hover: hover) and (pointer: fine) {
+  .marquee-container:hover .marquee-content {
+    animation-play-state: paused;
+  }
+}
+
+/* Keep hero actions still for keyboard navigation and reduced-motion users. */
+.hero-cta-magnet:focus-within > div {
+  transform: none !important;
+}
+
+@media (prefers-reduced-motion: reduce), (hover: none), (pointer: coarse) {
+  .hero-cta-magnet > div {
+    transform: none !important;
+    will-change: auto !important;
+  }
+}

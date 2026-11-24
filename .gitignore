@@ -1,0 +1,10 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+.local/
+backend/uploads/
+backend/prisma/*.db*
+*.log
+.revert-backups/
