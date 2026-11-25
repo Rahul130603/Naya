@@ -13,7 +13,8 @@ import {
   Menu, 
   X,
   Sparkles,
-  LogOut
+  LogOut,
+  MessageCircleQuestion
 } from 'lucide-react';
 import { CITIES } from '../data/healthcareData';
 import MagneticButton from './ui/MagneticButton';
@@ -64,6 +65,12 @@ export default function Navbar({
       line2: 'Store',
     },
     {
+      path: '/ask-doctor',
+      icon: MessageCircleQuestion,
+      line1: 'Ask a',
+      line2: 'Doctor',
+    },
+    {
       path: '/privacy-standards',
       icon: ShieldCheck,
       line1: 'Nayacura',
@@ -107,7 +114,7 @@ export default function Navbar({
                 <Link
                   key={item.path}
                   to={item.path}
-                  className={`relative flex items-center space-x-2.5 px-3.5 py-2.5 rounded-2xl transition-all duration-200 group ${
+                  className={`relative flex items-center space-x-2 px-2.5 xl:px-3 py-2.5 rounded-2xl transition-all duration-200 group ${
                     isActive
                       ? 'bg-[#E8F8EE] text-[#15803D]'
                       : 'text-slate-800 hover:text-[#0B3B82] hover:bg-slate-50'

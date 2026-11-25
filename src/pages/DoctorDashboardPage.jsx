@@ -1,8 +1,10 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import VideoCallRoom from '../components/VideoCallRoom';
+import DoctorQaSection from '../components/DoctorQaSection';
 import useVideoRoom from '../hooks/useVideoRoom';
 import { roomCodeFor } from '../lib/videoRoom';
+import { listQaThreads, subscribeQaThreads } from '../lib/communityQa';
 import { 
   LayoutDashboard,
   Users,
@@ -23,12 +25,14 @@ import {
   Calendar,
   MapPin,
   ArrowRight,
-  Building
+  Building,
+  MessageCircleQuestion
 } from 'lucide-react';
 
 const SECTION_TITLES = {
   overview: 'Dashboard Overview',
   queue: "Today's Patient Queue",
+  qa: 'Patient Doubts (Q&A)',
   video: 'Video Consultation Suite',
   prescriptions: 'Digital E-Prescriptions',
   emr: 'Patient Medical Records (EMR)',
@@ -55,6 +59,16 @@ export default function DoctorDashboardPage({ user, onLogout }) {
   const [isAcceptingInstantCalls, setIsAcceptingInstantCalls] = useState(true);
   const [queueFilter, setQueueFilter] = useState('all'); // 'all' | 'clinic' | 'video'
   const [selectedEmrPatient, setSelectedEmrPatient] = useState('PT-9410');
+  const [qaThreads, setQaThreads] = useState(() => listQaThreads());
+
+  useEffect(() => subscribeQaThreads(setQaThreads), []);
+
+  const pendingQaCount = qaThreads.filter((thread) => thread.answers.length === 0).length;
+
+  const showDoctorToast = (message) => {
+    setPrescribedToast(message);
+    setTimeout(() => setPrescribedToast(null), 4000);
+  };
 
   // Clinician profile
   const doctor = user?.role === 'doctor' ? user : {
@@ -71,6 +85,7 @@ export default function DoctorDashboardPage({ user, onLogout }) {
   const navItems = [
     { key: 'overview', label: 'Dashboard Overview', icon: LayoutDashboard },
     { key: 'queue', label: "Today's Queue", icon: Users },
+    { key: 'qa', label: 'Patient Doubts (Q&A)', icon: MessageCircleQuestion, badge: pendingQaCount },
     { key: 'video', label: 'Video Consultation Suite', icon: Video },
     { key: 'prescriptions', label: 'E-Prescriptions', icon: FileText },
     { key: 'emr', label: 'Patient Records (EMR)', icon: FlaskConical },
@@ -273,7 +288,7 @@ export default function DoctorDashboardPage({ user, onLogout }) {
             <p className="mb-4 px-2 text-xs font-extrabold uppercase tracking-widest text-slate-400">Doctor Portal</p>
             
             <div className="space-y-1">
-              {navItems.map(({ key, label, icon: Icon }) => (
+              {navItems.map(({ key, label, icon: Icon, badge }) => (
                 <button
                   key={key}
                   type="button"
@@ -285,7 +300,14 @@ export default function DoctorDashboardPage({ user, onLogout }) {
                   }`}
                 >
                   <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
-                  <span>{label}</span>
+                  <span className="flex-1 truncate">{label}</span>
+                  {badge > 0 && (
+                    <span className={`rounded-full px-2 py-0.5 text-[11px] font-extrabold ${
+                      activeSection === key ? 'bg-emerald-400 text-[#0B3B82]' : 'bg-amber-100 text-amber-800'
+                    }`}>
+                      {badge}
+                    </span>
+                  )}
                 </button>
               ))}
             </div>
@@ -521,6 +543,15 @@ export default function DoctorDashboardPage({ user, onLogout }) {
                     >
                       <Calendar className="h-4 w-4" />
                       Today's Queue ({patientsQueue.length})
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleNavClick('qa')}
+                      className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-5 py-2 text-sm font-bold text-amber-800 hover:bg-amber-100 transition"
+                    >
+                      <MessageCircleQuestion className="h-4 w-4" />
+                      Patient Doubts ({pendingQaCount} Pending)
                     </button>
                   </div>
                 </div>
@@ -1216,6 +1247,15 @@ export default function DoctorDashboardPage({ user, onLogout }) {
                 </div>
               </div>
             </div>
+          )}
+
+          {/* ==================== PATIENT DOUBTS (Q&A) ==================== */}
+          {activeSection === 'qa' && (
+            <DoctorQaSection
+              threads={qaThreads}
+              doctor={doctor}
+              onNotify={showDoctorToast}
+            />
           )}
 
           {/* ==================== G. CLINICIAN PROFILE ==================== */}

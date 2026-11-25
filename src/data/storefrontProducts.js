@@ -1,4 +1,4 @@
-import { TREATMENTS_STORE } from './healthcareData';
+import { TREATMENTS_STORE } from './healthcareData.js';
 
 const presentation = [
   { title: 'ED Consultation & Treatment', group: 'Men’s wellness', kind: 'box', color: '#0B3B82', background: '#EDF3FC', label: 'PERSONAL CARE', size: 'Doctor-guided care', consult: true, copy: 'Explore a treatment plan with a qualified specialist. Medication selection and prescribing require a consultation.' },

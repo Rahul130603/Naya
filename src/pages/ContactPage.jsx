@@ -43,6 +43,13 @@ export default function ContactPage() {
             </p>
 
             <div className="mt-6 flex flex-wrap items-center gap-4">
+              <a
+                href="mailto:support@nayacura.com"
+                className="flex items-center gap-2 text-xs font-bold text-[#0B3B82] bg-white px-4 py-2.5 rounded-2xl border border-emerald-200 shadow-sm hover:border-[#16A34A] transition"
+              >
+                <Mail className="w-4 h-4 text-[#16A34A]" />
+                <span>support@nayacura.com</span>
+              </a>
               <div className="flex items-center gap-2 text-xs font-bold text-slate-700 bg-white px-4 py-2.5 rounded-2xl border border-emerald-200 shadow-sm">
                 <PhoneCall className="w-4 h-4 text-[#16A34A]" />
                 <span>+91 98400 12345 (Confidential Desk)</span>
@@ -71,9 +78,9 @@ export default function ContactPage() {
             <div className="p-6 rounded-3xl bg-white border border-slate-200 shadow-card-soft">
               <Mail className="w-6 h-6 text-brand-navy mb-2" />
               <h4 className="text-sm font-bold text-brand-navy">Confidential Email Support</h4>
-              <p className="text-xs text-slate-500 mt-0.5">Encrypted mailbox</p>
-              <a href="mailto:care@nayacura.com" className="text-sm font-bold text-brand-navy mt-1 block">
-                care@nayacura.com
+              <p className="text-xs text-slate-500 mt-0.5">Facing any issue? Write to our care desk</p>
+              <a href="mailto:support@nayacura.com" className="text-sm font-bold text-brand-navy hover:text-brand-green mt-1.5 block transition">
+                support@nayacura.com
               </a>
             </div>
 
@@ -96,7 +103,10 @@ export default function ContactPage() {
                 </div>
                 <h3 className="text-xl font-bold text-brand-navy">Message Received Confidentially</h3>
                 <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                  Our private patient care coordinator will review your inquiry and reply discreetly within 2 hours.
+                  Our private patient care coordinator will review your inquiry and reply discreetly within 2 hours. For urgent issues, email{' '}
+                  <a href="mailto:support@nayacura.com" className="font-bold text-brand-navy hover:underline">
+                    support@nayacura.com
+                  </a>.
                 </p>
               </div>
             ) : (

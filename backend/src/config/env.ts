@@ -66,7 +66,7 @@ const schema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
   SMTP_FROM: z.string().default('Nayacura <no-reply@nayacura.example>'),
-  SUPPORT_EMAIL: z.string().default('support@nayacura.example'),
+  SUPPORT_EMAIL: z.string().default('support@nayacura.com'),
 });
 
 const parsed = schema.safeParse(process.env);

@@ -244,7 +244,7 @@ export default function PatientLoginPage({ onLoginSuccess, currentUser, onLogout
         return;
       }
       if (application?.status === 'rejected') {
-        setEmailError('This application was not approved. Write to support@nayacura.example for assistance.');
+        setEmailError('This application was not approved. Write to support@nayacura.com for assistance.');
         return;
       }
     }

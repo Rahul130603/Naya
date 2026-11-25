@@ -22,7 +22,7 @@ import {
   Star,
   Sparkles
 } from 'lucide-react';
-import { STORE_CATEGORIES, STORE_PRODUCTS } from '../data/storefrontProducts';
+import { getStoreCategories, listStoreProducts, subscribeStoreCatalog } from '../lib/storeCatalog';
 import { CART_KEY, MAX_QUANTITY, cartTotals, normalizeCart } from '../lib/storeCart';
 import ProductArtwork from './store/ProductArtwork';
 import Modal from './ui/Modal';
@@ -85,7 +85,8 @@ function OrderSummary({ totals }) {
   );
 }
 
-export default function MedicinesSection({ onOrderMedicine, storeOrders = [], onOpenTracking }) {
+export default function MedicinesSection({ onOrderMedicine, storeOrders = [], onOpenTracking, user }) {
+  const [products, setProducts] = useState(() => listStoreProducts());
   const [search, setSearch] = useState('');
   const [category, setCategory] = useState('All products');
   const [sort, setSort] = useState('featured');
@@ -98,11 +99,16 @@ export default function MedicinesSection({ onOrderMedicine, storeOrders = [], on
   const [trackingOrderId, setTrackingOrderId] = useState(null);
   const [cart, setCart] = useState(() => {
     try { 
-      return normalizeCart(JSON.parse(localStorage.getItem(CART_KEY) || '[]'), STORE_PRODUCTS); 
+      return normalizeCart(JSON.parse(localStorage.getItem(CART_KEY) || '[]'), listStoreProducts()); 
     } catch { 
       return []; 
     }
   });
+
+  useEffect(() => subscribeStoreCatalog((nextProducts) => {
+    setProducts(nextProducts);
+    setCart((current) => normalizeCart(current, nextProducts));
+  }), []);
 
   useEffect(() => { 
     try { 
@@ -119,9 +125,10 @@ export default function MedicinesSection({ onOrderMedicine, storeOrders = [], on
   }, []);
 
   const closeProduct = useCallback(() => setSelectedProduct(null), []);
-  const totals = cartTotals(cart, STORE_PRODUCTS);
+  const totals = cartTotals(cart, products);
+  const categories = getStoreCategories(products);
 
-  const visibleProducts = STORE_PRODUCTS.filter(product => {
+  const visibleProducts = products.filter(product => {
     const matchesCategory = category === 'All products' || product.group === category;
     const matchesSearch = `${product.title} ${product.name} ${product.group} ${product.desc || ''}`
       .toLowerCase()
@@ -136,14 +143,14 @@ export default function MedicinesSection({ onOrderMedicine, storeOrders = [], on
 
   const addToCart = product => {
     if (product.consult) return;
-    setCart(current => normalizeCart([...current, { id: product.id, quantity: 1 }], STORE_PRODUCTS));
+    setCart(current => normalizeCart([...current, { id: product.id, quantity: 1 }], products));
     setNotice(`${product.title} added to your bag.`);
   };
 
   const changeQuantity = (id, delta) => {
     setCart(current => normalizeCart(
       current.map(line => line.id === id ? { ...line, quantity: line.quantity + delta } : line), 
-      STORE_PRODUCTS
+      products
     ));
   };
 
@@ -193,6 +200,15 @@ export default function MedicinesSection({ onOrderMedicine, storeOrders = [], on
           </nav>
           
           <div className="flex items-center gap-2.5">
+            {user?.role === 'admin' && (
+              <Link
+                to="/admin-dashboard/store"
+                className="inline-flex items-center gap-1.5 rounded-full border border-[#0B3B82]/25 bg-blue-50 px-3.5 py-2 text-xs sm:text-sm font-bold text-[#0B3B82] hover:bg-blue-100 transition-all shadow-xs"
+              >
+                <Plus className="h-4 w-4 text-[#0B3B82]" />
+                <span>Manage Products</span>
+              </Link>
+            )}
             <button 
               type="button" 
               onClick={() => {
@@ -390,7 +406,7 @@ export default function MedicinesSection({ onOrderMedicine, storeOrders = [], on
             
             {/* Category Filter Pills */}
             <div className="flex flex-wrap gap-2" aria-label="Product categories">
-              {STORE_CATEGORIES.map(item => (
+              {categories.map(item => (
                 <button 
                   key={item} 
                   type="button" 

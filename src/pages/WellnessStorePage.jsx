@@ -1,13 +1,14 @@
 import React from 'react';
 import MedicinesSection from '../components/MedicinesSection';
 
-export default function WellnessStorePage({ onOrderMedicine, storeOrders, onOpenTracking }) {
+export default function WellnessStorePage({ onOrderMedicine, storeOrders, onOpenTracking, user }) {
   return (
     <div className="pt-4">
       <MedicinesSection 
         onOrderMedicine={onOrderMedicine} 
         storeOrders={storeOrders}
         onOpenTracking={onOpenTracking}
+        user={user}
       />
     </div>
   );

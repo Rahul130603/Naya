@@ -128,7 +128,7 @@ Temporary password: ${account.password}
 
 Sign in at /doctor-login and change your password from Profile & Security after your first login.
 
-For clinical governance queries write to support@nayacura.example.
+For clinical governance queries write to support@nayacura.com.
 
 Warm regards,
 Nayacura Clinician Onboarding`,

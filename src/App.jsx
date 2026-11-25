@@ -13,6 +13,7 @@ import ProceduresPage from './pages/ProceduresPage';
 import WellnessStorePage from './pages/WellnessStorePage';
 import ConditionDetailPage from './pages/ConditionDetailPage';
 import HealthFeedPage from './pages/HealthFeedPage';
+import AskDoctorPage from './pages/AskDoctorPage';
 import PrivacyStandardsPage from './pages/PrivacyStandardsPage';
 import ForSexologistsPage from './pages/ForSexologistsPage';
 import AboutPage from './pages/AboutPage';
@@ -287,6 +288,7 @@ function WebsiteApp() {
                 onOrderMedicine={handleOrderMedicine}
                 storeOrders={storeOrders}
                 onOpenTracking={handleOpenTracking}
+                user={user}
               />
             } 
           />
@@ -303,6 +305,7 @@ function WebsiteApp() {
           />
 
           <Route path="/health-feed" element={<HealthFeedPage />} />
+          <Route path="/ask-doctor" element={<AskDoctorPage user={user} />} />
           <Route path="/privacy-standards" element={<PrivacyStandardsPage />} />
           <Route path="/for-sexologists" element={<ForSexologistsPage onOpenDoctorOnboarding={() => setIsDoctorOnboardingOpen(true)} />} />
           <Route path="/about" element={<AboutPage />} />

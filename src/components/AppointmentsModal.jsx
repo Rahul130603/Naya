@@ -13,7 +13,8 @@ import {
   ChevronRight,
   ShoppingBag,
   ExternalLink,
-  ShieldCheck
+  ShieldCheck,
+  Mail
 } from 'lucide-react';
 import Modal from './ui/Modal';
 
@@ -276,6 +277,17 @@ export default function AppointmentsModal({
           </div>
         )
       )}
+
+      <div className="mt-5 rounded-2xl border border-blue-100 bg-[#F8FBFF] px-4 py-3 flex flex-wrap items-center justify-between gap-2 text-xs">
+        <span className="text-slate-600 font-medium">Need help with a booking or refund?</span>
+        <a
+          href="mailto:support@nayacura.com"
+          className="inline-flex items-center gap-1.5 font-bold text-[#0B3B82] hover:text-[#16A34A] transition"
+        >
+          <Mail className="h-3.5 w-3.5 text-[#16A34A]" />
+          <span>support@nayacura.com</span>
+        </a>
+      </div>
     </Modal>
   );
 }

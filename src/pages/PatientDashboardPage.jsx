@@ -373,7 +373,11 @@ export default function PatientDashboardPage({
                 <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />{label}
               </Link>
             ))}
-            <Link to="/contact" onClick={() => setSidebarOpen(false)} className="flex min-h-12 items-center gap-3 rounded-xl px-4 text-sm font-semibold hover:bg-[#F0F6FF]"><Headphones className="h-5 w-5" />Help & Support</Link>
+            <Link to="/contact" onClick={() => setSidebarOpen(false)} className="flex min-h-12 items-center gap-3 rounded-xl px-4 text-sm font-semibold hover:bg-[#F0F6FF]"><Headphones className="h-5 w-5" />Help &amp; Support</Link>
+            <a href="mailto:support@nayacura.com" className="mx-2 mb-2 flex items-center gap-2 rounded-xl border border-[#DCE7F6] bg-[#F8FBFF] px-3 py-2 text-[11px] font-bold text-[#0B3B82] hover:border-[#16A34A] transition">
+              <Mail className="h-3.5 w-3.5 shrink-0 text-[#16A34A]" />
+              <span className="truncate">support@nayacura.com</span>
+            </a>
             <button type="button" onClick={() => { onLogout?.(); navigate('/login'); }} className="flex min-h-12 w-full items-center gap-3 rounded-xl px-4 text-left text-sm font-semibold text-red-600 hover:bg-red-50"><LogOut className="h-5 w-5" />Logout</button>
           </div>
         </nav>
@@ -996,7 +1000,7 @@ export default function PatientDashboardPage({
                     <li className="flex items-start gap-2 rounded-xl bg-[#F8FBFF] p-3"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#16A34A]" />Records encrypted at rest with a per-platform key.</li>
                     <li className="flex items-start gap-2 rounded-xl bg-[#F8FBFF] p-3"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#16A34A]" />No third-party ad tracking on portal pages.</li>
                     <li className="flex items-start gap-2 rounded-xl bg-[#F8FBFF] p-3"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#16A34A]" />Deliveries always ship in plain packaging.</li>
-                    <li className="flex items-start gap-2 rounded-xl bg-[#F8FBFF] p-3"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#16A34A]" />You can request record deletion from Help & Support.</li>
+                    <li className="flex items-start gap-2 rounded-xl bg-[#F8FBFF] p-3"><CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-[#16A34A]" /><span>You can request record deletion or report an issue via <a href="mailto:support@nayacura.com" className="font-bold text-[#0B3B82] hover:underline">support@nayacura.com</a>.</span></li>
                   </ul>
                 </section>
               </div>

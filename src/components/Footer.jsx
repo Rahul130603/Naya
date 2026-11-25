@@ -29,7 +29,13 @@ export default function Footer({ onOpenDoctorOnboarding }) {
               <li><Link to="/about" className="hover:text-emerald-400 transition">Careers <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded font-bold">Hiring</span></Link></li>
               <li><Link to="/about" className="hover:text-emerald-400 transition">Press & Research</Link></li>
               <li><Link to="/health-feed" className="hover:text-emerald-400 transition">Sexual Health Feed</Link></li>
+              <li><Link to="/ask-doctor" className="hover:text-emerald-400 transition">Ask a Doctor (Q&amp;A)</Link></li>
               <li><Link to="/contact" className="hover:text-emerald-400 transition">Confidential Contact</Link></li>
+              <li>
+                <a href="mailto:support@nayacura.com" className="inline-flex items-center gap-1.5 text-emerald-400 hover:text-emerald-300 font-semibold transition">
+                  <Mail className="w-3.5 h-3.5" /> support@nayacura.com
+                </a>
+              </li>
               <li><Link to="/privacy-standards" className="hover:text-emerald-400 transition">256-Bit Data Privacy</Link></li>
             </ul>
           </div>
@@ -111,7 +117,11 @@ export default function Footer({ onOpenDoctorOnboarding }) {
           </div>
 
           {/* Security Badges */}
-          <div className="flex items-center gap-4 text-xs text-slate-400">
+          <div className="flex flex-wrap items-center justify-center gap-3 text-xs text-slate-400">
+            <a href="mailto:support@nayacura.com" className="flex items-center gap-1.5 bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700 hover:border-emerald-400 text-slate-200 transition">
+              <Mail className="w-4 h-4 text-emerald-400" />
+              <span>Support: support@nayacura.com</span>
+            </a>
             <Link to="/privacy-standards" className="flex items-center gap-1.5 bg-slate-800/80 px-3 py-1.5 rounded-xl border border-slate-700 hover:border-emerald-400 transition">
               <Lock className="w-4 h-4 text-emerald-400" />
               <span>100% Anonymous Consultations</span>

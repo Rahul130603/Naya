@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { isPortalPath } from '../src/lib/siteRouting.js';
 
 test('doctor-directory links stay in the public website', () => {
-  for (const path of ['/consult-sexologist', '/consult-sexologist/', '/video-consult', '/wellness-store', '/', '/condition/erectile-dysfunction']) {
+  for (const path of ['/consult-sexologist', '/consult-sexologist/', '/video-consult', '/wellness-store', '/ask-doctor', '/', '/condition/erectile-dysfunction']) {
     assert.equal(isPortalPath(path), false, path);
   }
 });

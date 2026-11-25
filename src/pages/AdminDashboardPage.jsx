@@ -10,6 +10,8 @@ import {
   subscribeRegistry,
 } from '../lib/doctorRegistry';
 import { getDocument } from '../lib/documentStore';
+import AdminStoreCatalogSection from '../components/AdminStoreCatalogSection';
+import { listStoreProducts, subscribeStoreCatalog } from '../lib/storeCatalog';
 import { 
   LayoutDashboard,
   ShieldCheck, 
@@ -50,6 +52,7 @@ const SECTION_TITLES = {
   logistics: 'Plain-Box Courier Logistics',
   telehealth: 'Telehealth Traffic & Telemetry',
   security: 'HIPAA Compliance & Security',
+  store: 'Wellness Store Catalog',
   orders: 'Wellness Store Orders Ledger',
   settings: 'System Configuration'
 };
@@ -70,8 +73,15 @@ export default function AdminDashboardPage({ user, onLogout }) {
   const [copiedCredential, setCopiedCredential] = useState(false);
   const [docPreview, setDocPreview] = useState(null);
   const [docUrls, setDocUrls] = useState({});
+  const [storeProducts, setStoreProducts] = useState(() => listStoreProducts());
 
   useEffect(() => subscribeRegistry(() => setDoctorApplications(listApplications())), []);
+  useEffect(() => subscribeStoreCatalog(setStoreProducts), []);
+
+  const showAdminToast = (message) => {
+    setAdminToast(message);
+    setTimeout(() => setAdminToast(null), 4000);
+  };
 
   const pendingApplications = doctorApplications.filter((application) => application.status === 'pending');
 
@@ -282,7 +292,8 @@ export default function AdminDashboardPage({ user, onLogout }) {
     { key: 'logistics', label: 'Plain-Box Logistics', icon: Package },
     { key: 'telehealth', label: 'Telehealth Traffic', icon: Activity },
     { key: 'security', label: 'HIPAA & Security', icon: ShieldCheck },
-    { key: 'orders', label: 'Store Orders Ledger', icon: ShoppingBag },
+    { key: 'store', label: 'Store Catalog', icon: ShoppingBag },
+    { key: 'orders', label: 'Store Orders Ledger', icon: FileCheck },
   ];
 
   return (
@@ -533,6 +544,15 @@ export default function AdminDashboardPage({ user, onLogout }) {
                     >
                       <Package className="h-4 w-4" />
                       Fulfillment Center ({logisticsOrders.length})
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => handleNavClick('store')}
+                      className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-5 py-2 text-sm font-bold text-[#0B3B82] hover:bg-blue-100 transition"
+                    >
+                      <ShoppingBag className="h-4 w-4" />
+                      Store Catalog ({storeProducts.length})
                     </button>
 
                     <button
@@ -1028,6 +1048,14 @@ export default function AdminDashboardPage({ user, onLogout }) {
             </div>
           )}
 
+          {/* ==================== STORE CATALOG MANAGEMENT ==================== */}
+          {activeSection === 'store' && (
+            <AdminStoreCatalogSection
+              products={storeProducts}
+              onNotify={showAdminToast}
+            />
+          )}
+
           {/* ==================== F. STORE ORDERS LEDGER ==================== */}
           {activeSection === 'orders' && (
             <div className="space-y-5 animate-fade-in">
@@ -1081,6 +1109,19 @@ export default function AdminDashboardPage({ user, onLogout }) {
                 <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
                   <p className="font-bold text-slate-400 uppercase text-[10px] tracking-wider">WebRTC Infrastructure</p>
                   <p className="font-extrabold text-slate-800 mt-1">LiveKit HD Cloud Edge (Chennai Node)</p>
+                </div>
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 md:col-span-2 flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="font-bold text-slate-400 uppercase text-[10px] tracking-wider">Patient &amp; Clinician Support Desk</p>
+                    <p className="font-extrabold text-[#0B3B82] mt-1">support@nayacura.com</p>
+                  </div>
+                  <a
+                    href="mailto:support@nayacura.com"
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-[#DCE7F6] bg-white px-3.5 py-2 text-xs font-bold text-[#0B3B82] hover:border-[#16A34A] transition"
+                  >
+                    <Mail className="h-3.5 w-3.5 text-[#16A34A]" />
+                    <span>Open Support Mailbox</span>
+                  </a>
                 </div>
               </div>
             </div>

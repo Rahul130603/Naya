@@ -46,6 +46,12 @@ const PUBLIC_ROUTES = {
       'Evidence-informed guides on sexual wellness, intimacy, relationships, STI prevention and treatment — reviewed by Nayacura clinicians.',
     breadcrumb: 'Health Feed',
   },
+  '/ask-doctor': {
+    title: 'Ask a Doctor — Anonymous Sexual Health Q&A',
+    description:
+      'Post your sexual and intimate health doubts anonymously and receive clear, judgement-free answers from verified Nayacura sexologists.',
+    breadcrumb: 'Ask a Doctor',
+  },
   '/for-sexologists': {
     title: 'For Sexologists — Join Our Verified Clinician Network',
     description:
