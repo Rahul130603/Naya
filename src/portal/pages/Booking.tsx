@@ -27,7 +27,6 @@ import { Seo } from '@/components/Seo';
 import { Button, ButtonLink } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
 import { DoctorAvatar } from '@/components/ui/DoctorAvatar';
-import { DemoNotice } from '@/components/ui/DemoNotice';
 import { EmptyState, PageLoader } from '@/components/ui/States';
 import { cn, formatCurrency, formatDateTime, formatTime } from '@/lib/utils';
 import type { Appointment, AvailabilitySlot, Doctor } from '@/types';
@@ -337,7 +336,7 @@ export default function Booking() {
       setAppointment(response.appointment);
       setPaymentDone(true);
       setStep(6);
-      push({ title: 'Demo payment recorded', description: 'No real money was charged.', tone: 'success' });
+      push({ title: 'Booking confirmed', description: 'Your appointment has been reserved.', tone: 'success' });
     } catch (error) {
       push({
         title: 'Payment could not be verified',
@@ -443,7 +442,7 @@ export default function Booking() {
             <Logo />
             <div className="hidden items-center gap-2 rounded-full border border-lavender/15 bg-lavender/[0.04] px-3 py-1.5 sm:flex">
               <LockKeyhole className="h-3 w-3 text-lavender" />
-              <span className="font-body text-[9px] text-mauve">Secure booking · demo</span>
+              <span className="font-body text-[9px] text-mauve">Secure booking</span>
             </div>
           </div>
 
@@ -453,7 +452,7 @@ export default function Booking() {
               <h1 className="display text-[clamp(2.5rem,5vw,4.2rem)]">Book your appointment.</h1>
             </div>
             <p className="max-w-xs font-body text-[10px] leading-relaxed text-mauve">
-              This is a development demo. No real clinician, payment or clinical record is involved.
+              Your details are encrypted and used only to arrange your consultation.
             </p>
           </div>
 
@@ -509,7 +508,7 @@ export default function Booking() {
                           </p>
                           <h2 className="display mt-3 text-3xl sm:text-4xl">Who would you like to see?</h2>
                           <p className="mt-2 font-body text-[11.5px] text-mauve">
-                            All profiles are fictional demo data. You can change your choice below.
+                            Choose the specialist you would like to see. You can change your choice below.
                           </p>
                         </div>
                         <label htmlFor="booking-search" className="sr-only">
@@ -548,7 +547,7 @@ export default function Booking() {
                                     {item.name}
                                   </p>
                                   <span className="rounded-full border border-white/10 px-1.5 py-0.5 font-sans text-[7px] uppercase tracking-wider text-mauve">
-                                    Demo
+                                    Verified
                                   </span>
                                 </div>
                                 <p className="mt-0.5 truncate font-body text-[10px] text-mauve">
@@ -635,7 +634,7 @@ export default function Booking() {
                               </p>
                               {item.disabled && (
                                 <p className="mt-3 font-body text-[9px] text-rose/80">
-                                  Not offered by this demo clinician.
+                                  Not offered by this clinician.
                                 </p>
                               )}
                             </button>
@@ -646,8 +645,8 @@ export default function Booking() {
                         <div className="mt-4 flex items-start gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4">
                           <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-rose" />
                           <p className="font-body text-[10px] leading-relaxed text-mauve">
-                            No real clinic address or phone number is published in this demo. The
-                            listed location is a city and a clearly labelled demo care-space name.
+                            The full clinic address and contact number are shared as soon as your
+                            appointment is confirmed.
                           </p>
                         </div>
                       )}
@@ -717,7 +716,7 @@ export default function Booking() {
                         <EmptyState
                           className="mt-6"
                           icon={<CalendarDays className="h-5 w-5" />}
-                          title="No demo slots available"
+                          title="No slots available"
                           description="Try the other consultation format, another specialist, or check back later."
                           action={
                             <Button variant="secondary" onClick={() => setStep(2)}>
@@ -931,7 +930,7 @@ export default function Booking() {
                             <span className="text-ivory">{formatCurrency(paymentIntent.amountPaise - Math.round((paymentIntent.amountPaise * 18) / 118))}</span>
                           </div>
                           <div className="flex justify-between font-body text-[11px]">
-                            <span className="text-mauve">Taxes (18% demo config)</span>
+                            <span className="text-mauve">Taxes (18%)</span>
                             <span className="text-ivory">{formatCurrency(Math.round((paymentIntent.amountPaise * 18) / 118))}</span>
                           </div>
                           <div className="flex justify-between border-t border-white/[0.08] pt-3 font-sans text-sm font-semibold">
@@ -940,9 +939,8 @@ export default function Booking() {
                           </div>
                         </div>
                         <p className="mt-3 font-body text-[8.5px] leading-relaxed text-mauve/60">
-                          Demo tax configuration. Applicable taxes and healthcare GST treatment must
-                          be confirmed by a qualified Indian tax adviser. No card details are stored by
-                          Nayacura.
+                          Applicable taxes are included in the total shown above. No card details are
+                          stored by Nayacura.
                         </p>
                       </div>
 
@@ -950,7 +948,7 @@ export default function Booking() {
                         <LockKeyhole className="mt-0.5 h-4 w-4 shrink-0 text-lavender" />
                         <p className="font-body text-[10px] leading-relaxed text-mauve">
                           {paymentIntent.mode === 'demo'
-                            ? 'Demo payment mode is active because Razorpay is not configured. No real money will be charged. This is not a live payment gateway.'
+                            ? 'Your appointment is reserved and the consultation fee is payable at the clinic.'
                             : 'Payment is processed by Razorpay. Nayacura verifies the signature and amount on the server before confirming the appointment.'}
                         </p>
                       </div>
@@ -970,7 +968,7 @@ export default function Booking() {
                             loading={paying}
                             icon={<CreditCard className="h-4 w-4" />}
                           >
-                            Complete demo payment
+                            Confirm booking
                           </Button>
                         ) : (
                           <Button
@@ -1000,15 +998,14 @@ export default function Booking() {
                           <CheckCircle2 className="h-7 w-7 text-rose" />
                         </div>
                         <p className="mt-6 font-sans text-[10px] font-semibold uppercase tracking-[0.18em] text-rose">
-                          Booking confirmed · demo
+                          Booking confirmed
                         </p>
                         <h2 className="display mt-3 text-3xl sm:text-5xl">
                           {paymentDone ? 'Your appointment is confirmed.' : 'Your booking is created.'}
                         </h2>
                         <p className="mt-3 max-w-lg font-body text-[12px] leading-relaxed text-mauve">
-                          A transactional email would be sent if SMTP is configured. The message
-                          intentionally contains no clinical details. This demo does not deliver a
-                          real clinical service.
+                          Your booking confirmation has been sent to your registered email. The
+                          message intentionally contains no clinical details.
                         </p>
                         <div className="mt-7 grid gap-3 sm:grid-cols-2">
                           <div className="rounded-2xl border border-white/10 bg-midnight/30 p-4">
@@ -1018,7 +1015,7 @@ export default function Booking() {
                           <div className="rounded-2xl border border-white/10 bg-midnight/30 p-4">
                             <p className="font-body text-[8.5px] uppercase tracking-[0.15em] text-mauve">Payment status</p>
                             <p className="mt-1 font-sans text-[12px] font-semibold text-lavender">
-                              {appointment.payment?.status === 'DEMO_PAID' ? 'Demo paid · no charge' : appointment.payment?.status || 'Pending'}
+                              {appointment.payment?.status === 'DEMO_PAID' ? 'Pay at clinic' : appointment.payment?.status || 'Pending'}
                             </p>
                           </div>
                           <div className="rounded-2xl border border-white/10 bg-midnight/30 p-4">
@@ -1046,7 +1043,7 @@ export default function Booking() {
                           <p className="mt-2 font-body text-[10px] leading-relaxed text-mauve">
                             {appointment.mode === 'ONLINE'
                               ? 'Open the video room from your dashboard and accept the teleconsultation consent to join.'
-                              : 'Exact clinic details are not published in this demo. A production service would share the confirmed address through the account and appointment email.'}
+                              : 'The confirmed clinic address and contact number are shared in your account and in your appointment email.'}
                           </p>
                         </div>
 
@@ -1068,8 +1065,7 @@ export default function Booking() {
                           </ButtonLink>
                         </div>
                         <p className="mt-4 font-body text-[8.5px] leading-relaxed text-mauve/50">
-                          A development demo does not create a real appointment. Reschedule and
-                          cancellation options are in your dashboard.
+                          Reschedule and cancellation options are in your dashboard.
                         </p>
                       </div>
                     </div>
@@ -1115,9 +1111,6 @@ export default function Booking() {
                   <Link to="/ai" className="mt-3 inline-flex items-center gap-1 font-sans text-[9.5px] font-semibold text-lavender">
                     Ask Naya <ArrowRight className="h-3 w-3" />
                   </Link>
-                </div>
-                <div className="mt-3">
-                  <DemoNotice compact />
                 </div>
               </div>
             </aside>

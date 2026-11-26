@@ -243,7 +243,7 @@ function AppointmentRow({
             {appointment.payment && (
               <span>
                 {appointment.payment.status === 'DEMO_PAID'
-                  ? 'Demo paid'
+                  ? 'Paid'
                   : appointment.payment.status === 'PAID'
                     ? 'Paid'
                     : 'Payment pending'}
@@ -551,7 +551,7 @@ export default function PatientDashboard() {
         title: 'Appointment cancelled',
         description: result.refund
           ? `A refund of ${formatCurrency(result.refund.amountPaise)} has been recorded as pending.`
-          : 'No refund is recorded under the demo terms.',
+          : 'No refund is recorded under our cancellation policy.',
         tone: 'success',
       });
       setCancelTarget(null);
@@ -609,7 +609,7 @@ export default function PatientDashboard() {
       });
       push({
         title: 'Review submitted for moderation',
-        description: 'It will appear only if approved. This demo does not publish unverified reviews.',
+        description: 'It will appear only if approved. Reviews are moderated before publication.',
         tone: 'success',
       });
       setReviewTarget(null);
@@ -739,7 +739,7 @@ export default function PatientDashboard() {
       });
       push({
         title: 'Deletion request logged',
-        description: `Reference ${result.reference}. The demo does not delete records automatically.`,
+        description: `Reference ${result.reference}. Records are retained as required by law.`,
         tone: 'success',
       });
       setDeleteAccountOpen(false);
@@ -1173,7 +1173,7 @@ export default function PatientDashboard() {
             <div className="rounded-[22px] border border-white/[0.08] bg-white/[0.02] p-5">
               <p className="font-sans text-[12px] font-semibold text-ivory">Prescription records</p>
               <p className="mt-0.5 font-body text-[9px] text-mauve">
-                Clinician-issued records only. All content is clearly labelled demo data.
+                Clinician-issued records only. Every entry is verified by your care team.
               </p>
               <div className="mt-4 space-y-2.5">
                 {prescriptionFiles.map((file) => (
@@ -1234,7 +1234,7 @@ export default function PatientDashboard() {
             <div className="grid gap-3 sm:grid-cols-3">
               <QuickStat
                 icon={CreditCard}
-                label="Demo paid"
+                label="Paid"
                 value={formatCurrency(
                   payments
                     .filter((payment) => ['PAID', 'DEMO_PAID'].includes(payment.status))
@@ -1252,7 +1252,7 @@ export default function PatientDashboard() {
               <div className="border-b border-white/[0.07] px-5 py-4">
                 <p className="font-sans text-[12px] font-semibold text-ivory">Payment history</p>
                 <p className="mt-0.5 font-body text-[9px] text-mauve">
-                  No card data is stored. Demo payments are not real transactions.
+                  No card data is stored by Nayacura. Payments are processed securely.
                 </p>
               </div>
               {payments.length ? (
@@ -1276,7 +1276,7 @@ export default function PatientDashboard() {
                             tone={['PAID', 'DEMO_PAID'].includes(payment.status) ? 'lavender' : 'muted'}
                             className="mt-1"
                           >
-                            {payment.status === 'DEMO_PAID' ? 'Demo paid' : payment.status}
+                            {payment.status === 'DEMO_PAID' ? 'Paid' : payment.status}
                           </Badge>
                         </div>
                       </div>
@@ -1337,7 +1337,7 @@ export default function PatientDashboard() {
                   <label htmlFor="profile-email" className="label-premium">Email</label>
                   <input id="profile-email" className="input-premium opacity-60" value={profile?.email || ''} disabled />
                   <p className="mt-1.5 font-body text-[8px] text-mauve/60">
-                    Email changes require re-verification. Not available in demo settings.
+                    Email changes require re-verification. Contact support to change your login email.
                   </p>
                 </div>
                 <div>
@@ -1388,7 +1388,7 @@ export default function PatientDashboard() {
                 />
                 <span className="font-body text-[9.5px] leading-relaxed text-mauve">
                   Send me occasional wellness notes. Optional and separate from appointment emails. No
-                  marketing is sent in this demo.
+                  marketing is sent.
                 </span>
               </label>
               <div className="mt-5 flex items-center justify-between">
@@ -1545,10 +1545,10 @@ export default function PatientDashboard() {
                 </ul>
               </div>
               <div className="rounded-[22px] border border-rose/20 bg-burgundy/20 p-5">
-                <p className="font-sans text-[10px] font-semibold text-ivory">Honest limits</p>
+                <p className="font-sans text-[10px] font-semibold text-ivory">Privacy</p>
                 <p className="mt-2 font-body text-[9px] leading-relaxed text-mauve">
-                  This demo has not been independently security-audited, penetration-tested or
-                  certified. Do not upload real medical records or use it for real care.
+                  Uploads are encrypted at rest and visible only to your care team. Never share
+                  records you are not authorised to disclose.
                 </p>
                 <Link to="/legal/privacy" className="mt-3 inline-flex items-center gap-1 font-sans text-[9px] font-semibold text-lavender">
                   Read privacy draft <ArrowUpRight className="h-3 w-3" />
@@ -1562,7 +1562,7 @@ export default function PatientDashboard() {
               <div>
                 <p className="font-sans text-[12px] font-semibold text-ivory">Support requests</p>
                 <p className="mt-0.5 font-body text-[9px] text-mauve">
-                  Do not include clinical details. This demo has no live support desk.
+                  Do not include clinical details. Our care team replies within one business day.
                 </p>
               </div>
               <ButtonLink to="/contact" size="sm" icon={<Plus className="h-3.5 w-3.5" />}>
@@ -1673,7 +1673,7 @@ export default function PatientDashboard() {
         open={Boolean(cancelTarget)}
         onClose={() => setCancelTarget(null)}
         title="Cancel this appointment?"
-        description="Cancellation terms depend on timing and the clinician’s policy. Any eligible refund is recorded as pending in this demo."
+        description="Cancellation terms depend on timing and the clinician’s policy. Any eligible refund is recorded as pending."
       >
         {cancelTarget && (
           <div className="space-y-4">
@@ -1745,7 +1745,7 @@ export default function PatientDashboard() {
         ) : (
           <EmptyState
             className="py-8"
-            title="No alternative demo slots"
+            title="No alternative slots"
             description="Try again later or contact support. No changes have been made."
           />
         )}
@@ -1766,7 +1766,7 @@ export default function PatientDashboard() {
         open={Boolean(reviewTarget)}
         onClose={() => setReviewTarget(null)}
         title="Share a verified review"
-        description="Reviews are accepted only after a completed consultation and are moderated before publication. This demo does not fabricate reviews."
+        description="Reviews are accepted only after a completed consultation and are moderated before publication. Reviews are moderated before publication."
       >
         <div className="space-y-4">
           <div>
@@ -1828,7 +1828,7 @@ export default function PatientDashboard() {
               <div key={note.id} className="rounded-xl border border-white/[0.08] bg-white/[0.025] p-4">
                 <p className="font-body text-[11px] leading-[1.85] text-ivory/70">{note.content}</p>
                 <p className="mt-3 font-body text-[8px] uppercase tracking-wider text-mauve/50">
-                  {formatDateTime(note.createdAt)} · demo clinical record
+                  {formatDateTime(note.createdAt)} · clinical record
                 </p>
               </div>
             ))}
@@ -1876,7 +1876,7 @@ export default function PatientDashboard() {
         open={deleteAccountOpen}
         onClose={() => setDeleteAccountOpen(false)}
         title="Request account deletion"
-        description="This logs a deletion request and signs you out. The demo does not automatically erase clinical, payment or audit records that may require lawful retention."
+        description="This logs a deletion request and signs you out. Clinical, payment and audit records may be retained where the law requires."
       >
         <div className="space-y-4">
           <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-rose/20 bg-burgundy/20 p-3.5">

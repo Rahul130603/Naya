@@ -67,7 +67,7 @@ export default function Register() {
       });
       push({
         title: 'Your private account is ready',
-        description: 'In local demo mode, the verification link is printed in the API terminal.',
+        description: 'Check your inbox to verify your email address.',
         tone: 'success',
       });
       navigate('/dashboard', { replace: true });
@@ -161,8 +161,7 @@ export default function Register() {
               <span className="font-body text-[10.5px] leading-relaxed text-mauve">
                 I have read and accept the{' '}
                 <Link to="/legal/privacy" className="text-lavender underline">Privacy Policy</Link> and{' '}
-                <Link to="/legal/terms" className="text-lavender underline">Terms of Service</Link>. I
-                understand this is a development demo.
+                <Link to="/legal/terms" className="text-lavender underline">Terms of Service</Link>.
               </span>
             </label>
             {errors.consent && <p className="font-body text-[10px] text-rose">{errors.consent.message}</p>}

@@ -22,7 +22,7 @@ export function AuthLayout() {
       </main>
       <footer className="border-t border-slate-200 bg-white">
         <div className="mx-auto flex max-w-7xl flex-wrap justify-between gap-4 px-5 py-5 text-xs text-mauve sm:px-8">
-          <p>© {new Date().getFullYear()} Nayacura · Development demo</p>
+          <p>© {new Date().getFullYear()} Nayacura</p>
           <nav aria-label="Account support" className="flex gap-5"><Link to="/privacy-standards">Privacy</Link><Link to="/legal/terms">Terms</Link><Link to="/contact">Support</Link></nav>
         </div>
       </footer>

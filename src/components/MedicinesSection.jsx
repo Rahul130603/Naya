@@ -754,7 +754,7 @@ export default function MedicinesSection({ onOrderMedicine, storeOrders = [], on
         onClose={closeCart} 
         title={
           cartStep === 'success' 
-            ? 'Your demo order is ready' 
+            ? 'Your order is ready'
             : cartStep === 'checkout' 
               ? 'Delivery details' 
               : `Your shopping bag (${totals.count})`
@@ -878,10 +878,10 @@ export default function MedicinesSection({ onOrderMedicine, storeOrders = [], on
               <OrderSummary totals={totals} />
               <p className="my-4 flex items-start gap-2 text-xs leading-relaxed text-slate-500">
                 <LockKeyhole className="mt-0.5 h-4 w-4 shrink-0 text-[#16A34A]" />
-                Demo checkout only. No payment required; no delivery is scheduled.
+                Secure checkout. Pay on delivery or online; dispensed in plain, unbranded packaging.
               </p>
               <button type="submit" className={`${primaryGreen} w-full`}>
-                Place demo order <ArrowRight className="h-4 w-4" />
+                Place order <ArrowRight className="h-4 w-4" />
               </button>
             </div>
           </form>

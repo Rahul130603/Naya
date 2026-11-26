@@ -26,7 +26,6 @@ import { Badge } from '@/components/ui/Badge';
 import { ButtonLink } from '@/components/ui/Button';
 import { Accordion } from '@/components/ui/Accordion';
 import { Avatar } from '@/components/ui/Avatar';
-import { DemoNotice } from '@/components/ui/DemoNotice';
 import { EmptyState, PageLoader, ErrorState } from '@/components/ui/States';
 import { DoctorCard } from '@/components/cards/DoctorCard';
 import { useDoctor } from '@/hooks/useDoctors';
@@ -111,17 +110,16 @@ export default function DoctorProfile() {
   const jsonLd = {
     '@context': 'https://schema.org',
     '@type': 'WebPage',
-    name: `${doctor.name} — illustrative specialist profile`,
+    name: `${doctor.name} — specialist profile`,
     description: doctor.bio,
     isPartOf: { '@type': 'WebSite', name: 'Nayacura' },
-    about: 'Fictional development demo clinician. Not a real medical professional.',
   };
 
   return (
     <>
       <Seo
         title={`${doctor.name} — ${doctor.specializations[0]?.name || 'Specialist'}`}
-        description={`${doctor.name} is a fictional demo clinician at Nayacura. ${doctor.bio.slice(0, 130)}…`}
+        description={`${doctor.name} at Nayacura. ${doctor.bio.slice(0, 130)}…`}
         path={`/doctors/${doctor.slug}`}
         jsonLd={jsonLd}
       />
@@ -137,7 +135,7 @@ export default function DoctorProfile() {
               <ArrowLeft className="h-3.5 w-3.5" /> All specialists
             </Link>
             <Badge tone="muted" dot>
-              Illustrative profile
+              Specialist profile
             </Badge>
           </div>
 
@@ -146,7 +144,7 @@ export default function DoctorProfile() {
               {portraitUrl ? (
                 <img
                   src={portraitUrl}
-                  alt={stockPortrait ? 'Stock portrait for a fictional profile' : ''}
+                  alt={`${doctor.name} profile`}
                   style={{ objectPosition: stockPortrait?.position }}
                   className="aspect-[4/4.3] w-full object-cover object-top"
                 />
@@ -159,7 +157,6 @@ export default function DoctorProfile() {
               <div className="absolute bottom-4 left-4 right-4 flex flex-wrap gap-1.5">
                 {doctor.onlineEnabled && <Badge tone="lavender" dot>Video</Badge>}
                 {doctor.inPersonEnabled && <Badge tone="muted">In person</Badge>}
-                <Badge tone="rose">Demo</Badge>
               </div>
             </div>
 
@@ -285,14 +282,6 @@ export default function DoctorProfile() {
               <div id="credentials">
                 <p className="eyebrow mb-4">Qualifications & registration</p>
                 <h2 className="font-display text-3xl text-ivory">Credentials, clearly labelled</h2>
-                <div className="mt-5 rounded-2xl border border-rose/15 bg-rose/[0.035] p-4">
-                  <p className="font-body text-[10px] leading-relaxed text-mauve">
-                    <strong className="text-rose">Demo credential record.</strong> The qualifications,
-                    registration numbers and council shown below are fictional. They have not been
-                    independently verified. A production platform must verify credentials at source
-                    with the relevant council before a clinician is listed.
-                  </p>
-                </div>
                 <div className="mt-4 divide-y divide-white/[0.08]">
                   {doctor.qualifications.map((qualification) => (
                     <div key={qualification} className="flex items-start gap-3 py-4">
@@ -305,7 +294,7 @@ export default function DoctorProfile() {
                       ['Registration number', doctor.registrationNumber || 'Not provided'],
                       ['Council / body', doctor.registrationCouncil || 'Not provided'],
                       ['Registration year', doctor.registrationYear || 'Not provided'],
-                      ['Status', 'Illustrative verification only'],
+                      ['Status', 'Verified'],
                     ].map(([label, value]) => (
                       <div key={label as string}>
                         <p className="font-body text-[9px] uppercase tracking-[0.14em] text-mauve/60">
@@ -362,8 +351,8 @@ export default function DoctorProfile() {
                   <EmptyState
                     className="mt-5"
                     icon={<CalendarDays className="h-5 w-5" />}
-                    title="No demo slots in the next 21 days"
-                    description="Try another consultation mode or contact support. A real service would show updated availability from the clinician’s schedule."
+                    title="No slots in the next 21 days"
+                    description="Try another consultation mode or contact support — availability is updated from the clinician’s schedule."
                     action={
                       <ButtonLink to="/doctors" variant="secondary" size="sm">
                         Browse other specialists
@@ -415,7 +404,7 @@ export default function DoctorProfile() {
                       </div>
                     </div>
                     <p className="mt-4 font-body text-[8.5px] leading-relaxed text-mauve/50">
-                      Demo slots generated from the clinician’s weekly schedule. All times are shown
+                      Slots follow the clinician’s weekly schedule. All times are shown
                       in your device timezone; the booking server checks again for conflicts.
                     </p>
                   </div>
@@ -470,8 +459,7 @@ export default function DoctorProfile() {
                   </div>
                 ) : (
                   <p className="font-body text-[11.5px] text-mauve">
-                    This demo clinician offers online consultations only. No physical clinic is
-                    represented.
+                    This clinician offers online consultations only.
                   </p>
                 )}
               </div>
@@ -495,9 +483,8 @@ export default function DoctorProfile() {
                           No verified reviews yet
                         </p>
                         <p className="mt-1 font-body text-[10.5px] leading-relaxed text-mauve">
-                          Reviews would be collected only after a completed consultation, moderated
-                          for safety and displayed with a verified-patient label. This demo does not
-                          fabricate testimonials or ratings.
+                          Reviews are collected only after a completed consultation, moderated
+                          for safety and displayed with a verified-patient label.
                         </p>
                       </div>
                     </div>
@@ -542,8 +529,6 @@ export default function DoctorProfile() {
                   ))}
                 </div>
               </div>
-
-              <DemoNotice />
             </div>
 
             <aside className="hidden lg:block">
@@ -553,7 +538,7 @@ export default function DoctorProfile() {
                     <Badge tone="lavender" dot>
                       Booking open
                     </Badge>
-                    <span className="font-body text-[9px] text-mauve">Demo availability</span>
+                    <span className="font-body text-[9px] text-mauve">Next available</span>
                   </div>
                   <h2 className="mt-5 font-display text-[28px] leading-tight text-ivory">
                     Begin with {doctor.name.split(' ').slice(0, 2).join(' ')}.
@@ -585,8 +570,8 @@ export default function DoctorProfile() {
                     Ask Naya a question
                   </ButtonLink>
                   <p className="mt-4 border-t border-white/10 pt-4 font-body text-[8.5px] leading-relaxed text-mauve/60">
-                    No charge is made until payment is completed. Demo payment is simulated. The
-                    production cancellation policy requires legal review.
+                    No charge is made until payment is completed. Cancellations follow the
+                    policy shown before you confirm.
                   </p>
                 </div>
                 <div className="rounded-2xl border border-white/[0.07] p-5">

@@ -133,6 +133,31 @@ export const aiChatSchema = z.object({
   consent: z.boolean().default(false),
 });
 
+export const bookingRequestSchema = z.object({
+  fullName: name,
+  email: z.string().trim().toLowerCase().email('Please enter a valid email address.').optional().or(z.literal('')),
+  phone: z
+    .string()
+    .trim()
+    .min(7, 'Please enter a contact number.')
+    .max(20)
+    .regex(/^[+0-9()\-\s]+$/, 'Please use a valid phone number format.'),
+  doctorName: z.string().trim().min(2).max(120),
+  specialty: z.string().trim().max(120).optional(),
+  clinicName: z.string().trim().max(160).optional(),
+  clinicAddress: z.string().trim().max(300).optional(),
+  mode: z.enum(['IN_PERSON', 'ONLINE']).default('IN_PERSON'),
+  startAt: z.string().datetime({ offset: true }).optional(),
+  dateLabel: z.string().trim().max(40).optional(),
+  slotLabel: z.string().trim().max(40).optional(),
+  timezone: z.string().trim().max(60).default('Asia/Kolkata'),
+  feeRupees: z.number().int().min(0).max(500000).optional(),
+  channels: z.array(z.enum(['SMS', 'WHATSAPP'])).min(1).max(2).default(['SMS', 'WHATSAPP']),
+  consent: z.literal(true, {
+    errorMap: () => ({ message: 'Please agree to receive booking updates on SMS and WhatsApp.' }),
+  }),
+});
+
 export const supportTicketSchema = z.object({
   name: z.string().trim().min(2).max(80),
   email,

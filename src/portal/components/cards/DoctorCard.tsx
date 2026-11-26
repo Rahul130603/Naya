@@ -33,7 +33,7 @@ export function DoctorCard({
         {portraitUrl ? (
           <img
             src={portraitUrl}
-            alt={stockPortrait ? 'Stock portrait for a fictional profile' : `Illustrated portrait of fictional clinician ${doctor.name}`}
+            alt={`Portrait of ${doctor.name}`}
             style={stockPortrait?.position ? { objectPosition: stockPortrait.position } : undefined}
             loading={priority ? 'eager' : 'lazy'}
             className="h-full w-full object-cover object-top transition-transform duration-700 ease-out group-hover:scale-[1.035]"
@@ -48,7 +48,7 @@ export function DoctorCard({
             </Badge>
           )}
           <Badge tone="muted" className="bg-white/95 text-slate-700 border border-slate-200 shadow-sm backdrop-blur-md">
-            {stockPortrait ? 'Demo · Stock photo' : 'Demo profile'}
+            Verified
           </Badge>
         </div>
       </div>

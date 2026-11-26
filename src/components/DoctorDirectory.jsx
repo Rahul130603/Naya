@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
 import { 
-  Star, 
   MapPin, 
   Clock, 
   Calendar, 
@@ -8,15 +7,27 @@ import {
   CheckCircle2, 
   ThumbsUp, 
   SlidersHorizontal,
-  ChevronRight,
   ShieldCheck,
-  Stethoscope,
-  Sparkles,
   Lock
 } from 'lucide-react';
 import { DOCTORS, SPECIALTIES } from '../data/healthcareData';
 import MagneticButton from './ui/MagneticButton';
 import ShinyText from './ui/ShinyText';
+
+// Some profile photos point at remote URLs that can 404; fall back to a tidy
+// initials avatar instead of the browser's broken-image placeholder.
+const initialsAvatar = (name = '') => {
+  const initials = name
+    .replace(/^Dr\.?\s*/i, '')
+    .trim()
+    .split(/\s+/)
+    .map((part) => part[0] || '')
+    .slice(0, 2)
+    .join('')
+    .toUpperCase();
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160"><rect width="160" height="160" fill="#E8F5EC"/><text x="80" y="100" font-family="Inter, system-ui, sans-serif" font-size="58" font-weight="700" fill="#15803D" text-anchor="middle">${initials}</text></svg>`;
+  return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
+};
 
 export default function DoctorDirectory({ 
   selectedCity, 
@@ -209,87 +220,106 @@ export default function DoctorDirectory({
         ) : (
           <div className="space-y-6">
             {filteredDoctors.map((doc) => (
-              <div 
+              <div
                 key={doc.id}
-                className="bg-white rounded-3xl border border-slate-200/90 p-6 sm:p-7 shadow-card-soft hover:shadow-xl hover:border-brand-green/30 transition-all duration-300 group"
+                className="group rounded-2xl border border-slate-200/90 bg-white p-5 shadow-card-soft transition-all duration-300 hover:border-brand-green/30 hover:shadow-xl sm:rounded-3xl sm:p-7"
               >
-                <div className="flex flex-col lg:flex-row gap-6">
-                  
+                <div className="flex flex-col gap-5 md:flex-row md:gap-6">
+
                   {/* Doctor Photo & Badges */}
-                  <div className="flex flex-wrap sm:flex-col items-center sm:items-start gap-4 lg:shrink-0">
-                    <div className="relative">
-                      <img 
-                        src={doc.photo} 
-                        alt={doc.name} 
-                        className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl object-cover border-2 border-slate-100 shadow-md group-hover:scale-102 transition duration-300" 
+                  <div className="flex flex-wrap items-start gap-4 md:shrink-0 md:flex-col md:gap-3">
+                    <div className="relative shrink-0">
+                      <img
+                        src={doc.photo}
+                        alt={doc.name}
+                        loading="lazy"
+                        onError={(e) => {
+                          const img = e.currentTarget;
+                          if (img.dataset.fallback) return;
+                          img.dataset.fallback = 'true';
+                          img.src = initialsAvatar(doc.name);
+                        }}
+                        className="h-20 w-20 rounded-2xl border-2 border-slate-100 object-cover shadow-md transition duration-300 group-hover:scale-[1.02] sm:h-28 sm:w-28"
                       />
-                      <div className="absolute -bottom-2 -right-2 bg-brand-green text-white p-1 rounded-full shadow-md">
-                        <CheckCircle2 className="w-4 h-4" />
-                      </div>
+                      <span className="absolute -bottom-1.5 -right-1.5 grid place-items-center rounded-full bg-brand-green p-1 text-white shadow-md ring-2 ring-white">
+                        <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
+                      </span>
                     </div>
 
-                    <div className="min-w-0 flex flex-col gap-1 text-left">
-                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-2.5 py-0.5 text-[11px] font-bold text-brand-green-dark">
-                        <ThumbsUp className="w-3 h-3 text-brand-green" />
+                    <div className="flex min-w-0 flex-1 flex-col items-start gap-1.5 md:flex-none">
+                      <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-bold leading-none text-brand-green-dark">
+                        <ThumbsUp className="h-3 w-3 text-brand-green" aria-hidden="true" />
                         {doc.rating}% ({doc.reviewsCount} Stories)
                       </span>
-                      <span className="text-[11px] text-slate-400 font-medium">
+                      <span className="text-xs font-semibold text-slate-500">
                         {doc.experience} Years Experience
                       </span>
                     </div>
                   </div>
 
                   {/* Doctor Info Details */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex flex-wrap items-start justify-between gap-2">
-                      <div>
-                        <h3 className="text-xl font-bold text-brand-navy group-hover:text-brand-green-dark transition flex items-center gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="min-w-0 flex-1">
+                        <h3 className="text-xl font-bold leading-snug text-brand-navy transition group-hover:text-brand-green-dark sm:text-[22px]">
                           {doc.name}
                         </h3>
-                        <p className="text-xs font-semibold text-slate-500 mt-0.5">
+                        <p className="mt-1 text-xs font-semibold leading-relaxed text-slate-500">
                           {doc.degree}
                         </p>
-                        <p className="text-sm font-bold text-brand-green mt-1">
+                        <p className="mt-1.5 text-sm font-bold text-brand-green">
                           {doc.specialty}
                         </p>
                       </div>
 
-                      {/* Fee Box */}
-                      <div className="text-right bg-slate-50 border border-slate-100 rounded-2xl p-3 px-4">
-                        <div className="text-xs text-slate-400 font-semibold">Confidential Consultation</div>
+                      {/* Fee box — tablet & desktop */}
+                      <div className="hidden shrink-0 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-right sm:block">
+                        <div className="text-xs font-semibold text-slate-400">Confidential Consultation</div>
                         <div className="text-lg font-extrabold text-brand-navy">
-                          ₹{doc.fee} <span className="text-[10px] text-slate-400 font-normal">at clinic</span>
+                          ₹{doc.fee} <span className="text-[10px] font-normal text-slate-400">at clinic</span>
                         </div>
-                        <div className="text-xs font-bold text-emerald-600 mt-0.5">
+                        <div className="mt-0.5 text-xs font-bold text-emerald-600">
                           Discreet Video: ₹{doc.videoFee}
                         </div>
                       </div>
                     </div>
 
+                    {/* Fee strip — phone: full width so the prices stop floating mid-card */}
+                    <div className="mt-3 grid grid-cols-2 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 sm:hidden">
+                      <div className="min-w-0 px-3 py-2.5">
+                        <div className="text-[10px] font-bold uppercase tracking-wide text-slate-500">In-Clinic Visit</div>
+                        <div className="mt-0.5 text-base font-extrabold text-brand-navy">₹{doc.fee}</div>
+                      </div>
+                      <div className="min-w-0 border-l border-slate-200 px-3 py-2.5">
+                        <div className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Discreet Video</div>
+                        <div className="mt-0.5 text-base font-extrabold text-emerald-600">₹{doc.videoFee}</div>
+                      </div>
+                    </div>
+
                     {/* About snippet */}
-                    <p className="mt-3 text-xs text-slate-600 line-clamp-2">
+                    <p className="mt-4 text-[13px] leading-relaxed text-slate-600 line-clamp-2 sm:text-xs">
                       {doc.about}
                     </p>
 
                     {/* Clinic Address & Languages */}
-                    <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-slate-600">
+                    <div className="mt-4 grid grid-cols-1 gap-3 text-xs text-slate-600 sm:grid-cols-2">
                       <div className="flex items-start gap-2">
-                        <MapPin className="w-4 h-4 text-slate-400 mt-0.5 flex-shrink-0" />
-                        <div>
+                        <MapPin className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" />
+                        <div className="min-w-0">
                           <span className="font-bold text-slate-800">{doc.clinicName}</span>
                           <p className="text-slate-500 break-words">{doc.clinicAddress}</p>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2">
-                        <Clock className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                        <div>
+                      <div className="flex items-start gap-2">
+                        <Clock className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-500" />
+                        <div className="min-w-0">
                           {doc.availableToday ? (
                             <span className="font-bold text-emerald-600">Available Today (100% Private Room)</span>
                           ) : (
                             <span className="font-bold text-amber-600">Next Available Tomorrow</span>
                           )}
-                          <p className="text-slate-400">
+                          <p className="text-slate-500">
                             Languages: {doc.languages.join(', ')}
                           </p>
                         </div>
@@ -297,25 +327,25 @@ export default function DoctorDirectory({
                     </div>
 
                     {/* Key Services Offered */}
-                    <div className="mt-4 flex flex-wrap gap-1.5">
+                    <div className="mt-4 flex flex-wrap gap-2">
                       {doc.services.slice(0, 4).map((serv, idx) => (
-                        <span key={idx} className="text-[11px] font-semibold bg-slate-100 text-slate-700 px-2.5 py-0.5 rounded-lg border border-slate-200">
+                        <span key={idx} className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-700">
                           {serv}
                         </span>
                       ))}
                     </div>
 
                     {/* Available Slot Pills Preview */}
-                    <div className="mt-4 pt-3 border-t border-slate-100">
-                      <div className="text-[11px] font-bold uppercase tracking-wider text-slate-400 mb-2 flex items-center gap-1.5">
-                        <Calendar className="w-3.5 h-3.5 text-brand-green" />
+                    <div className="mt-5 border-t border-slate-100 pt-4">
+                      <div className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                        <Calendar className="h-3.5 w-3.5 text-brand-green" />
                         Confidential Slots for {doc.availableToday ? 'Today' : 'Tomorrow'}
                       </div>
-                      <div className="flex flex-wrap gap-2">
+                      <div className="grid grid-cols-4 gap-1.5 sm:flex sm:flex-wrap sm:gap-2">
                         {(doc.availableToday ? doc.slots.today : doc.slots.tomorrow).slice(0, 4).map((slot, idx) => (
-                          <span 
+                          <span
                             key={idx}
-                            className="px-2.5 py-1 rounded-lg bg-emerald-50/70 border border-emerald-200/60 text-xs font-bold text-brand-green-dark"
+                            className="rounded-lg border border-emerald-200/70 bg-emerald-50/70 px-1 py-1.5 text-center text-[11px] font-bold text-brand-green-dark sm:px-2.5"
                           >
                             {slot}
                           </span>
@@ -324,20 +354,20 @@ export default function DoctorDirectory({
                     </div>
 
                     {/* Action Buttons */}
-                    <div className="mt-6 flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">
+                    <div className="mt-5 flex flex-col gap-2.5 sm:mt-6 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
                       <button
                         onClick={() => onBookAppointment(doc, 'clinic')}
-                        className="flex-1 sm:flex-none px-6 py-2.5 rounded-xl bg-brand-navy hover:bg-brand-navy-dark text-white font-bold text-xs shadow-md transition hover:shadow-glow-navy flex items-center justify-center gap-2"
+                        className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-brand-navy px-6 py-2.5 text-xs font-bold text-white shadow-md transition hover:bg-brand-navy-dark hover:shadow-glow-navy sm:flex-none"
                       >
-                        <Calendar className="w-4 h-4 text-brand-green-light" />
+                        <Calendar className="h-4 w-4 text-brand-green-light" aria-hidden="true" />
                         <span>Book Confidential In-Clinic Visit</span>
                       </button>
 
                       <button
                         onClick={() => onStartVideoConsult(doc)}
-                        className="flex-1 sm:flex-none px-5 py-2.5 rounded-xl bg-brand-green-soft border border-emerald-300 hover:bg-brand-green hover:text-white text-brand-green-dark font-bold text-xs transition flex items-center justify-center gap-2 group-btn"
+                        className="group-btn flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-emerald-300 bg-brand-green-soft px-5 py-2.5 text-xs font-bold text-brand-green-dark transition hover:bg-brand-green hover:text-white sm:flex-none"
                       >
-                        <Video className="w-4 h-4" />
+                        <Video className="h-4 w-4" aria-hidden="true" />
                         <span>Discreet Video/Audio Call (₹{doc.videoFee})</span>
                       </button>
                     </div>

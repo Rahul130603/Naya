@@ -35,6 +35,7 @@ import {
 } from '../services/serializers';
 import { createPaymentOrder, fetchAndValidateRazorpayPayment, verifyRazorpaySignature } from '../services/payments';
 import { sendBookingCancellation, sendBookingConfirmation } from '../services/mailer';
+import { formatWhen, sendBookingNotifications } from '../services/messaging';
 import { audit } from '../utils/audit';
 import { logger } from '../utils/logger';
 import {
@@ -474,6 +475,28 @@ appointmentsRouter.post(
       timezone: updated.timezone,
       mode: updated.mode,
     });
+
+    // SMS + WhatsApp copy for the patient's mobile. Booking details only — no
+    // clinical information is ever sent through either channel.
+    try {
+      if (updated.patient.phone) {
+        await sendBookingNotifications({
+          to: updated.patient.phone,
+          reference: updated.bookingId,
+          patientName: updated.patient.user.name,
+          doctorName: updated.doctor.user.name,
+          specialty: updated.doctor.specializations[0]?.specialization.name,
+          when: formatWhen(updated.startAt.toISOString(), updated.timezone),
+          mode: updated.mode as 'ONLINE' | 'IN_PERSON',
+          feeRupees: Math.round(updated.feePaise / 100),
+        });
+      }
+    } catch (error) {
+      logger.warn('booking.sms_whatsapp_failed', {
+        bookingId: updated.bookingId,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
     await audit({
       req,
       action: 'PAYMENT_VERIFIED',

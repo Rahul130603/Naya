@@ -22,6 +22,7 @@ import { aiRouter } from './routes/ai';
 import { supportRouter } from './routes/support';
 import { newsletterRouter } from './routes/newsletter';
 import { demoRoomsRouter } from './routes/demoRooms';
+import { bookingRequestsRouter } from './routes/bookingRequests';
 
 export function createApp() {
   const app = express();
@@ -94,6 +95,8 @@ export function createApp() {
           livekit: env.livekitConfigured,
           llm: env.llmConfigured,
           smtp: env.smtpConfigured,
+          sms: env.smsConfigured,
+          whatsapp: env.whatsappConfigured,
         },
       });
     } catch {
@@ -111,6 +114,7 @@ export function createApp() {
   app.use('/api/ai', aiRouter);
   app.use('/api/support', supportRouter);
   app.use('/api/newsletter', newsletterRouter);
+  app.use('/api', bookingRequestsRouter);
 
   app.use('/api', notFoundHandler);
 

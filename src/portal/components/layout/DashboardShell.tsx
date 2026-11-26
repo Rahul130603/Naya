@@ -246,7 +246,7 @@ export function DashboardShell({
             </div>
             <div className="flex items-center gap-2">
               {headerAction ?? <span className="hidden items-center gap-1.5 rounded-full border border-lavender/15 bg-lavender/[0.04] px-3 py-1.5 font-body text-[8.5px] text-lavender sm:inline-flex">
-                <span className="h-1.5 w-1.5 rounded-full bg-lavender" /> Demo environment
+                <span className="h-1.5 w-1.5 rounded-full bg-lavender" /> Connected
               </span>}
               <div
                 ref={accountRef}

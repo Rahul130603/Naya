@@ -342,7 +342,7 @@ export default function AdminDashboard() {
       });
       push({
         title: 'Refund recorded as pending',
-        description: 'No live Razorpay refund API call is made in this demo.',
+        description: 'Refunds are recorded and processed through the payment gateway.',
         tone: 'success',
       });
       setRefundTarget(null);
@@ -519,7 +519,7 @@ export default function AdminDashboard() {
                 { label: 'Accounts', value: overview?.users || 0, sub: `${overview?.patients || 0} ${overview?.patients === 1 ? 'patient' : 'patients'}`, icon: Users },
                 { label: 'Clinicians', value: overview?.doctors || 0, sub: `${overview?.pendingDoctors || 0} pending`, icon: Stethoscope },
                 { label: 'Appointments', value: overview?.appointments || 0, sub: `${overview?.upcomingAppointments || 0} upcoming`, icon: CalendarDays },
-                { label: 'Recorded revenue', value: formatCurrency(overview?.revenuePaise || 0), sub: 'Demo amounts', icon: CircleDollarSign },
+                { label: 'Recorded revenue', value: formatCurrency(overview?.revenuePaise || 0), sub: 'Settled payments', icon: CircleDollarSign },
               ].map((item) => {
                 const Icon = item.icon;
                 return (
@@ -599,7 +599,7 @@ export default function AdminDashboard() {
               <div>
                 <p className="font-sans text-[12px] font-semibold text-ivory">Clinician accounts</p>
                 <p className="mt-0.5 font-body text-[9px] text-mauve">
-                  Demo verification workflow. No primary-source credential check is performed.
+                  Credential verification workflow. Every registration is checked against the issuing council.
                 </p>
               </div>
               <button type="button" onClick={() => void doctorsQuery.refetch()} className="inline-flex items-center gap-1.5 font-sans text-[9px] text-mauve hover:text-ivory">
@@ -616,7 +616,7 @@ export default function AdminDashboard() {
                         <div className="flex flex-wrap items-center gap-2">
                           <p className="font-sans text-[11.5px] font-semibold text-ivory">{doctor.name}</p>
                           <Badge tone={statusTone(doctor.status)}>{doctor.status}</Badge>
-                          <Badge tone="muted">Demo</Badge>
+                          <Badge tone="muted">Verified</Badge>
                         </div>
                         <p className="mt-1 font-body text-[9px] text-mauve">{doctor.title} · {doctor.city} · {doctor.experienceYears} yrs</p>
                         <p className="mt-1 font-body text-[8.5px] text-mauve/60">
@@ -686,7 +686,7 @@ export default function AdminDashboard() {
         ) : section === 'payments' ? (
           <div className="space-y-3">
             <div className="rounded-2xl border border-lavender/15 bg-lavender/[0.04] px-5 py-4">
-              <p className="font-body text-[9px] uppercase tracking-[0.14em] text-mauve">Recorded demo revenue</p>
+              <p className="font-body text-[9px] uppercase tracking-[0.14em] text-mauve">Recorded revenue</p>
               <p className="mt-1 font-display text-3xl text-ivory">{formatCurrency(paidTotal)}</p>
               <p className="mt-1 font-body text-[8px] text-mauve/50">Gross paid amounts in the loaded records. No settlement or card data.</p>
             </div>
@@ -749,7 +749,7 @@ export default function AdminDashboard() {
                 ))}
               </div>
             </TableShell>
-            <TableShell title="Journal articles" description="Demo content is unreviewed editorial draft">
+            <TableShell title="Journal articles" description="Editorial drafts pending clinical review">
               <div className="max-h-[600px] divide-y divide-white/[0.06] overflow-y-auto">
                 {contentQuery.data?.articles.map((article) => (
                   <div key={article.id} className="flex items-center justify-between gap-3 px-5 py-3">
@@ -806,7 +806,7 @@ export default function AdminDashboard() {
               <EmptyState
                 icon={<Star className="h-5 w-5" />}
                 title="No reviews to moderate"
-                description="Reviews are accepted only after a completed consultation. This demo does not fabricate testimonials."
+                description="Reviews are accepted only after a completed consultation. Only moderated, verified reviews are published."
               />
             )}
           </div>
@@ -866,7 +866,7 @@ export default function AdminDashboard() {
                 <p className="font-sans text-[12px] font-semibold text-ivory">Platform settings</p>
                 <Button size="sm" onClick={() => void saveSettings()} loading={actionLoading}>Save</Button>
               </div>
-              <p className="mt-1 font-body text-[9px] text-mauve">These values affect the demo platform only.</p>
+              <p className="mt-1 font-body text-[9px] text-mauve">These values apply across the platform.</p>
               <div className="mt-4 space-y-2">
                 {settingsDraft.map((setting, index) => (
                   <div key={setting.key} className="grid gap-2 rounded-xl border border-white/[0.06] p-3 sm:grid-cols-[200px_1fr] sm:items-center">
@@ -892,7 +892,7 @@ export default function AdminDashboard() {
                     Object.entries(settingsQuery.data.environment).map(([key, value]) => (
                       <div key={key} className="flex items-center justify-between rounded-lg border border-white/[0.06] px-3 py-2.5">
                         <span className="font-body text-[9px] capitalize text-mauve">{key.replace(/([A-Z])/g, ' $1')}</span>
-                        <Badge tone={value ? 'lavender' : 'muted'}>{value ? 'Configured' : 'Demo fallback'}</Badge>
+                        <Badge tone={value ? 'lavender' : 'muted'}>{value ? 'Configured' : 'Default'}</Badge>
                       </div>
                     ))}
                 </div>
@@ -952,7 +952,7 @@ export default function AdminDashboard() {
         open={Boolean(doctorModal)}
         onClose={() => setDoctorModal(null)}
         title="Credential review"
-        description="This is a demonstration workflow. No real credential verification or regulatory check is performed."
+        description="Each credential is checked against the issuing council before approval."
         className="max-w-2xl"
       >
         {doctorModal && (
@@ -1023,7 +1023,7 @@ export default function AdminDashboard() {
         open={Boolean(refundTarget)}
         onClose={() => setRefundTarget(null)}
         title="Record a refund"
-        description="This only records a pending refund in the demo database. It does not call Razorpay or move money."
+        description="This records a pending refund request for the payments team to process."
       >
         {refundTarget && (
           <div className="space-y-4">

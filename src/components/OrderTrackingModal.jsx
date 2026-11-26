@@ -51,7 +51,6 @@ export default function OrderTrackingModal({
       case 'packed':
         return 1;
       case 'confirmed':
-      case 'demo order':
       default:
         return 2; // Default realistic preview: In Transit
     }

@@ -52,7 +52,7 @@ export default function ForgotPassword() {
             </p>
             {!clinician && <div className="mt-4 rounded-xl border border-white/[0.08] bg-white/[0.025] p-4">
               <p className="font-body text-[10px] leading-relaxed text-mauve">
-                <strong className="text-ivory">Local demo without SMTP:</strong> the reset link is
+                <strong className="text-ivory">Check your inbox:</strong> the reset link is
                 printed in the API terminal. Email delivery requires the SMTP environment variables.
               </p>
             </div>}

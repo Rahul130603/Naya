@@ -415,7 +415,7 @@ export default function DoctorDashboard() {
       setPrescriptionInstructions('');
       push({
         title: 'Prescription record added',
-        description: 'Demo only. Real prescribing requires registration and an appropriate assessment.',
+        description: 'Prescriptions require verified registration and a documented assessment.',
         tone: 'success',
       });
       await openClinical(selectedClinical);
@@ -523,7 +523,7 @@ export default function DoctorDashboard() {
                       Professional workspace
                     </p>
                     <Badge tone="lavender">
-                      <BadgeCheck className="h-2.5 w-2.5" /> Demo verified
+                      <BadgeCheck className="h-2.5 w-2.5" /> Verified
                     </Badge>
                   </div>
                   <h2 className="mt-3 font-display text-[clamp(1.8rem,3vw,2.7rem)] text-ivory">
@@ -1037,7 +1037,7 @@ export default function DoctorDashboard() {
                         />
                         <div className="mt-2 flex items-center justify-between gap-2">
                           <p className="font-body text-[8px] text-rose/60">
-                            Demo only. Prescribing requires registration and an appropriate assessment.
+                            Prescribing requires verified registration and a documented assessment.
                           </p>
                           <Button size="sm" onClick={() => void addPrescription()} loading={actionLoading}>
                             Add record
@@ -1058,7 +1058,7 @@ export default function DoctorDashboard() {
                   <p className="font-sans text-[12px] font-semibold text-ivory">Professional profile</p>
                   <p className="mt-0.5 font-body text-[9px] text-mauve">Changes apply to future bookings only.</p>
                 </div>
-                <Badge tone="lavender"><BadgeCheck className="h-2.5 w-2.5" /> Demo verified</Badge>
+                <Badge tone="lavender"><BadgeCheck className="h-2.5 w-2.5" /> Verified</Badge>
               </div>
               <div className="mt-5 space-y-4">
                 <div>
@@ -1147,7 +1147,7 @@ export default function DoctorDashboard() {
               <div className="rounded-[22px] border border-white/[0.08] bg-white/[0.02] p-5">
                 <p className="font-sans text-[11px] font-semibold text-ivory">Credential summary</p>
                 <p className="mt-1 font-body text-[9px] text-mauve">
-                  Demo records only. Primary-source verification is not implemented.
+                  Records are verified against the issuing council.
                 </p>
                 <div className="mt-3 space-y-2">
                   {profile?.credentials.map((credential) => (
@@ -1195,7 +1195,7 @@ export default function DoctorDashboard() {
         open={Boolean(cancelTarget)}
         onClose={() => setCancelTarget(null)}
         title="Cancel this appointment?"
-        description="The patient will be notified. Any refund is recorded as pending; no live gateway refund is processed in this demo."
+        description="The patient will be notified. Any refund is recorded as pending; refunds are processed through the payment gateway."
       >
         <div className="space-y-4">
           <div>

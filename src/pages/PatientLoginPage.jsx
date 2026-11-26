@@ -1,11 +1,18 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { findApplicationByEmail, listAccounts } from '../lib/doctorRegistry';
+import {
+  HELLO_EMAIL,
+  dispatchWelcomeEmail,
+  findApplicationByEmail,
+  findPatientByEmail,
+  listAccounts,
+  registerPatient,
+} from '../lib/doctorRegistry';
 import { 
   Lock, 
   LockKeyhole, 
-  Phone, 
   Mail, 
+  User,
   ArrowRight, 
   Sparkles, 
   ShieldCheck, 
@@ -18,14 +25,10 @@ import {
   UserCheck, 
   Package, 
   Stethoscope, 
-  Bot, 
   LogOut,
-  Building2,
   FileText,
   Server,
-  Award,
-  KeyRound,
-  BadgeCheck
+  Award
 } from 'lucide-react';
 
 export default function PatientLoginPage({ onLoginSuccess, currentUser, onLogout, initialRole }) {
@@ -40,44 +43,27 @@ export default function PatientLoginPage({ onLoginSuccess, currentUser, onLogout
     return 'patient';
   });
 
-  // Tab: 'phone' (Mobile OTP) | 'email' (Email & Password / Reg No)
-  const [activeTab, setActiveTab] = useState('phone');
-
-  // Phone OTP Flow State
-  const [phone, setPhone] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
-  const [otp, setOtp] = useState(['', '', '', '']);
-  const [resendTimer, setResendTimer] = useState(30);
-  const [phoneError, setPhoneError] = useState('');
+  // Patient mode: 'login' | 'register' (Email-only, no phone number required)
+  const [patientAuthMode, setPatientAuthMode] = useState('login');
+  const [patientName, setPatientName] = useState('');
 
   // Email Flow State
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(true);
   const [emailError, setEmailError] = useState('');
   const [doctorRegNo, setDoctorRegNo] = useState('');
 
   // General Loading & Feedback State
   const [isLoading, setIsLoading] = useState(false);
   const [loginSuccessMessage, setLoginSuccessMessage] = useState(null);
+  const [emailPreviewUrl, setEmailPreviewUrl] = useState(null);
 
   // Update role if pathname changes
   useEffect(() => {
     if (location.pathname.includes('doctor')) setSelectedRole('doctor');
     else if (location.pathname.includes('admin')) setSelectedRole('admin');
   }, [location.pathname]);
-
-  // Timer countdown when OTP is sent
-  useEffect(() => {
-    let interval = null;
-    if (otpSent && resendTimer > 0) {
-      interval = setInterval(() => {
-        setResendTimer(prev => prev - 1);
-      }, 1000);
-    }
-    return () => clearInterval(interval);
-  }, [otpSent, resendTimer]);
 
   // Role details configuration
   const roleConfigs = {
@@ -88,10 +74,9 @@ export default function PatientLoginPage({ onLoginSuccess, currentUser, onLogout
       title: 'Welcome to Nayacura',
       subtitle: 'Sign in to access your confidential doctor appointments, certified prescriptions, lab reports, and discreet orders.',
       demoName: 'Suresh Kumar',
-      demoTitle: '1-Click Demo Patient',
+      demoTitle: 'Sign in as Patient',
       demoUser: {
         name: 'Suresh Kumar',
-        phone: '+91 98401 23456',
         email: 'suresh.kumar@nayacura.patient',
         role: 'patient',
         id: 'NC-PAT-4921',
@@ -109,13 +94,12 @@ export default function PatientLoginPage({ onLoginSuccess, currentUser, onLogout
       title: 'Clinician Consultation Portal',
       subtitle: 'Sign in to your private clinician suite. Access today’s patient queue, encrypted HD video rooms, and E-Prescription stamping.',
       demoName: 'Dr. Arvind Swaminathan',
-      demoTitle: '1-Click Demo Doctor',
+      demoTitle: 'Sign in as Clinician',
       demoUser: {
         name: 'Dr. Arvind Swaminathan',
         regNo: 'TN-MED-44819',
         specialty: 'Clinical Sexologist & Andrologist',
         email: 'dr.arvind@nayacura.clinic',
-        phone: '+91 94440 18291',
         role: 'doctor',
         clinic: 'Nayacura Men & Women Intimate Health Clinic, Chennai'
       },
@@ -131,7 +115,7 @@ export default function PatientLoginPage({ onLoginSuccess, currentUser, onLogout
       title: 'Administration Console',
       subtitle: 'Least-privilege operational access for doctor credentialing, plain-box courier dispatch, and platform security auditing.',
       demoName: 'Operations Director',
-      demoTitle: '1-Click Demo Admin',
+      demoTitle: 'Sign in as Admin',
       demoUser: {
         name: 'Platform Operations Admin',
         email: 'admin@nayacura.internal',
@@ -147,48 +131,41 @@ export default function PatientLoginPage({ onLoginSuccess, currentUser, onLogout
 
   const currentConfig = roleConfigs[selectedRole];
 
-  // Handle Mobile Number Submission
-  const handleSendOtp = (e) => {
+  // Handle Patient Email Registration
+  const handlePatientRegister = async (e) => {
     e?.preventDefault();
-    setPhoneError('');
-    const cleanPhone = phone.replace(/\D/g, '');
-    if (cleanPhone.length !== 10) {
-      setPhoneError('Please enter a valid 10-digit Indian mobile number.');
-      return;
-    }
-
-    setIsLoading(true);
-    setTimeout(() => {
+    setEmailError('');
+    setEmailPreviewUrl(null);
+    try {
+      const { patient, welcomeMail } = registerPatient({ name: patientName, email, password });
+      setIsLoading(true);
+      const emailStatus = await dispatchWelcomeEmail({
+        to: patient.email,
+        name: patient.name,
+        role: 'patient',
+        mailId: welcomeMail.id,
+      });
       setIsLoading(false);
-      setOtpSent(true);
-      setResendTimer(30);
-      setOtp(['4', '8', '2', '9']);
-    }, 600);
-  };
-
-  // Handle OTP Verification
-  const handleVerifyOtp = (e) => {
-    e?.preventDefault();
-    const enteredOtp = otp.join('');
-    if (enteredOtp.length < 4) {
-      setPhoneError('Please enter the complete 4-digit verification code.');
-      return;
-    }
-
-    setIsLoading(true);
-    setTimeout(() => {
+      if (onLoginSuccess) onLoginSuccess(patient);
+      if (emailStatus?.sent) {
+        setLoginSuccessMessage(`Account created! Welcome email sent from ${HELLO_EMAIL} to ${patient.email}. Redirecting...`);
+        setTimeout(() => navigate('/patient-dashboard'), 1200);
+      } else if (emailStatus?.previewUrl) {
+        setEmailPreviewUrl(emailStatus.previewUrl);
+        setLoginSuccessMessage(
+          `Account created! SMTP is not configured for real Gmail delivery yet — a test email preview from ${HELLO_EMAIL} is ready below. Redirecting...`,
+        );
+        setTimeout(() => navigate('/patient-dashboard'), 3200);
+      } else {
+        setLoginSuccessMessage(
+          `Account created & welcome email queued in Outbox (${HELLO_EMAIL} → ${patient.email}). Configure SMTP_HOST/USER/PASS in backend/.env for real inbox delivery.`,
+        );
+        setTimeout(() => navigate('/patient-dashboard'), 2400);
+      }
+    } catch (err) {
       setIsLoading(false);
-      const userObj = {
-        ...currentConfig.demoUser,
-        phone: `+91 ${phone || '9840123456'}`
-      };
-
-      if (onLoginSuccess) onLoginSuccess(userObj);
-      setLoginSuccessMessage(`Signed in securely as ${userObj.name}! Redirecting...`);
-      setTimeout(() => {
-        navigate(currentConfig.redirectPath);
-      }, 1000);
-    }, 700);
+      setEmailError(err?.message || 'Could not create your account.');
+    }
   };
 
   // Handle Email & Password Login
@@ -203,6 +180,24 @@ export default function PatientLoginPage({ onLoginSuccess, currentUser, onLogout
     if (!password || password.length < 6) {
       setEmailError('Password must be at least 6 characters.');
       return;
+    }
+
+    if (selectedRole === 'patient') {
+      const registeredPatient = findPatientByEmail(email);
+      if (registeredPatient) {
+        if (registeredPatient.password !== password) {
+          setEmailError('Incorrect password for this registered email.');
+          return;
+        }
+        setIsLoading(true);
+        setTimeout(() => {
+          setIsLoading(false);
+          if (onLoginSuccess) onLoginSuccess(registeredPatient);
+          setLoginSuccessMessage(`Signed in securely as ${registeredPatient.name}! Redirecting...`);
+          setTimeout(() => navigate('/patient-dashboard'), 900);
+        }, 500);
+        return;
+      }
     }
 
     if (selectedRole === 'doctor') {
@@ -279,19 +274,6 @@ export default function PatientLoginPage({ onLoginSuccess, currentUser, onLogout
     }, 400);
   };
 
-  // Handle single digit OTP box change
-  const handleOtpBoxChange = (index, value) => {
-    const digit = value.replace(/\D/g, '').slice(-1);
-    const updated = [...otp];
-    updated[index] = digit;
-    setOtp(updated);
-
-    if (digit && index < 3) {
-      const nextInput = document.getElementById(`otp-input-${index + 1}`);
-      if (nextInput) nextInput.focus();
-    }
-  };
-
   return (
     <div className="min-h-[calc(100vh-80px)] bg-slate-50 py-10 sm:py-14 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
       {/* Ambient Brand Glow Effects */}
@@ -310,7 +292,7 @@ export default function PatientLoginPage({ onLoginSuccess, currentUser, onLogout
           <div className="inline-flex p-1.5 rounded-2xl bg-slate-200/80 border border-slate-300/70 shadow-xs max-w-md w-full">
             <button
               type="button"
-              onClick={() => { setSelectedRole('patient'); setOtpSent(false); setLoginSuccessMessage(null); }}
+              onClick={() => { setSelectedRole('patient'); setEmailError(''); setLoginSuccessMessage(null); }}
               className={`flex-1 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 transition-all ${
                 selectedRole === 'patient'
                   ? 'bg-white text-[#0B3B82] shadow-sm'
@@ -323,7 +305,7 @@ export default function PatientLoginPage({ onLoginSuccess, currentUser, onLogout
 
             <button
               type="button"
-              onClick={() => { setSelectedRole('doctor'); setOtpSent(false); setLoginSuccessMessage(null); }}
+              onClick={() => { setSelectedRole('doctor'); setEmailError(''); setLoginSuccessMessage(null); }}
               className={`flex-1 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 transition-all ${
                 selectedRole === 'doctor'
                   ? 'bg-white text-[#0B3B82] shadow-sm'
@@ -336,7 +318,7 @@ export default function PatientLoginPage({ onLoginSuccess, currentUser, onLogout
 
             <button
               type="button"
-              onClick={() => { setSelectedRole('admin'); setOtpSent(false); setLoginSuccessMessage(null); }}
+              onClick={() => { setSelectedRole('admin'); setEmailError(''); setLoginSuccessMessage(null); }}
               className={`flex-1 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 transition-all ${
                 selectedRole === 'admin'
                   ? 'bg-white text-[#0B3B82] shadow-sm'
@@ -414,21 +396,36 @@ export default function PatientLoginPage({ onLoginSuccess, currentUser, onLogout
 
                 {/* Success Notification */}
                 {loginSuccessMessage && (
-                  <div className="mt-5 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-sm font-bold flex items-center gap-3 animate-fade-in">
-                    <CheckCircle2 className="h-5 w-5 text-[#16A34A] shrink-0" />
-                    <span>{loginSuccessMessage}</span>
+                  <div className="mt-5 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-sm font-bold space-y-2 animate-fade-in">
+                    <div className="flex items-start gap-3">
+                      <CheckCircle2 className="h-5 w-5 text-[#16A34A] shrink-0 mt-0.5" />
+                      <span>{loginSuccessMessage}</span>
+                    </div>
+                    {emailPreviewUrl && (
+                      <div className="pl-8">
+                        <a
+                          href={emailPreviewUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1.5 rounded-lg bg-white border border-emerald-300 px-3 py-1.5 text-xs font-extrabold text-[#0B3B82] hover:bg-emerald-100 transition"
+                        >
+                          <Mail className="h-3.5 w-3.5 text-[#16A34A]" />
+                          Open Test Email Preview (from {HELLO_EMAIL})
+                        </a>
+                      </div>
+                    )}
                   </div>
                 )}
 
-                {/* 1-Click Quick Demo Sign In Button (Role-Specific) */}
+                {/* Quick role-based sign in */}
                 <div className="mt-6 p-4 rounded-2xl bg-slate-50 border border-slate-200/80 hover:border-emerald-300 transition-colors">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
                       <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0B3B82]">
-                        <Sparkles className="h-3.5 w-3.5 text-emerald-600" /> Fast Evaluation Shortcut
+                        <Sparkles className="h-3.5 w-3.5 text-emerald-600" /> Quick access
                       </span>
                       <p className="text-xs text-slate-500 mt-0.5">
-                        Test the <strong>{selectedRole}</strong> experience instantly as <strong>{currentConfig.demoName}</strong>.
+                        Continue as <strong>{currentConfig.demoName}</strong> ({selectedRole}).
                       </p>
                     </div>
                     <button
@@ -443,158 +440,137 @@ export default function PatientLoginPage({ onLoginSuccess, currentUser, onLogout
                   </div>
                 </div>
 
-                {/* Login Method Segmented Control / Tabs */}
-                <div className="mt-7 flex rounded-2xl bg-slate-100 p-1.5 border border-slate-200/70">
-                  <button
-                    type="button"
-                    onClick={() => { setActiveTab('phone'); setPhoneError(''); }}
-                    className={`flex-1 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all ${
-                      activeTab === 'phone'
-                        ? 'bg-white text-[#0B3B82] shadow-sm border border-slate-200/60'
-                        : 'text-slate-600 hover:text-[#0B3B82]'
-                    }`}
-                  >
-                    <Phone className={`h-4 w-4 ${activeTab === 'phone' ? 'text-[#16A34A]' : 'text-slate-400'}`} />
-                    <span>Mobile OTP</span>
-                    <span className="hidden sm:inline-block px-1.5 py-0.5 rounded text-[10px] bg-emerald-100 text-[#15803D] font-extrabold uppercase tracking-wide">
-                      Instant
-                    </span>
-                  </button>
+                {/* Email-Only Mode Tabs for Patient (Sign In vs Create Account) */}
+                {selectedRole === 'patient' ? (
+                  <div className="mt-7 flex rounded-2xl bg-slate-100 p-1.5 border border-slate-200/70">
+                    <button
+                      type="button"
+                      onClick={() => { setPatientAuthMode('login'); setEmailError(''); }}
+                      className={`flex-1 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all ${
+                        patientAuthMode === 'login'
+                          ? 'bg-white text-[#0B3B82] shadow-sm border border-slate-200/60'
+                          : 'text-slate-600 hover:text-[#0B3B82]'
+                      }`}
+                    >
+                      <Mail className={`h-4 w-4 ${patientAuthMode === 'login' ? 'text-[#16A34A]' : 'text-slate-400'}`} />
+                      <span>Sign In (Email)</span>
+                    </button>
 
-                  <button
-                    type="button"
-                    onClick={() => { setActiveTab('email'); setEmailError(''); }}
-                    className={`flex-1 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all ${
-                      activeTab === 'email'
-                        ? 'bg-white text-[#0B3B82] shadow-sm border border-slate-200/60'
-                        : 'text-slate-600 hover:text-[#0B3B82]'
-                    }`}
-                  >
-                    <Mail className={`h-4 w-4 ${activeTab === 'email' ? 'text-[#16A34A]' : 'text-slate-400'}`} />
-                    <span>Email & Credentials</span>
-                  </button>
-                </div>
+                    <button
+                      type="button"
+                      onClick={() => { setPatientAuthMode('register'); setEmailError(''); }}
+                      className={`flex-1 py-2.5 px-3 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 transition-all ${
+                        patientAuthMode === 'register'
+                          ? 'bg-white text-[#0B3B82] shadow-sm border border-slate-200/60'
+                          : 'text-slate-600 hover:text-[#0B3B82]'
+                      }`}
+                    >
+                      <UserCheck className={`h-4 w-4 ${patientAuthMode === 'register' ? 'text-[#16A34A]' : 'text-slate-400'}`} />
+                      <span>Register with Email</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mt-6 rounded-2xl border border-slate-200/80 bg-slate-50 px-4 py-2.5 text-xs font-bold text-[#0B3B82] flex items-center gap-2">
+                    <Mail className="h-4 w-4 text-[#16A34A]" />
+                    <span>Email &amp; Credentials Sign In (No phone number required)</span>
+                  </div>
+                )}
 
                 {/* Form Body */}
                 <div className="mt-6">
-                  {/* TAB 1: MOBILE OTP FLOW */}
-                  {activeTab === 'phone' && (
-                    <div>
-                      {!otpSent ? (
-                        <form onSubmit={handleSendOtp} className="space-y-4">
-                          <div>
-                            <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
-                              Registered Mobile Number (India)
-                            </label>
-                            <div className="relative flex items-center">
-                              <span className="absolute left-3.5 flex items-center gap-1.5 text-xs font-bold text-slate-600 pr-2 border-r border-slate-200">
-                                🇮🇳 +91
-                              </span>
-                              <input
-                                type="tel"
-                                inputMode="numeric"
-                                maxLength={10}
-                                placeholder="Enter 10-digit mobile number"
-                                value={phone}
-                                onChange={(e) => {
-                                  setPhone(e.target.value.replace(/\D/g, ''));
-                                  if (phoneError) setPhoneError('');
-                                }}
-                                className="w-full pl-20 pr-4 py-3 rounded-2xl border border-slate-200 text-sm font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#16A34A]/20 focus:border-[#16A34A] transition-all bg-slate-50/50 focus:bg-white"
-                                required
-                              />
-                            </div>
-                            {phoneError && (
-                              <p className="mt-1.5 text-xs font-bold text-red-600 flex items-center gap-1">
-                                <AlertCircle className="h-3.5 w-3.5" /> {phoneError}
-                              </p>
-                            )}
-                          </div>
+                  {selectedRole === 'patient' && patientAuthMode === 'register' ? (
+                    <form onSubmit={handlePatientRegister} className="space-y-4">
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+                          Full Name
+                        </label>
+                        <div className="relative">
+                          <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                          <input
+                            type="text"
+                            placeholder="e.g. Karthik S."
+                            value={patientName}
+                            onChange={(e) => {
+                              setPatientName(e.target.value);
+                              if (emailError) setEmailError('');
+                            }}
+                            className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-200 text-sm font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#16A34A]/20 focus:border-[#16A34A] transition-all bg-slate-50/50 focus:bg-white"
+                            required
+                          />
+                        </div>
+                      </div>
 
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+                          Email Address
+                        </label>
+                        <div className="relative">
+                          <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                          <input
+                            type="email"
+                            placeholder="you@example.com"
+                            value={email}
+                            onChange={(e) => {
+                              setEmail(e.target.value);
+                              if (emailError) setEmailError('');
+                            }}
+                            className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-200 text-sm font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#16A34A]/20 focus:border-[#16A34A] transition-all bg-slate-50/50 focus:bg-white"
+                            required
+                          />
+                        </div>
+                        <p className="mt-1 text-[11px] text-slate-500">
+                          A welcome email will be sent from <strong>{HELLO_EMAIL}</strong> to this address.
+                        </p>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
+                          Create Password
+                        </label>
+                        <div className="relative">
+                          <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                          <input
+                            type={showPassword ? 'text' : 'password'}
+                            placeholder="Minimum 6 characters"
+                            value={password}
+                            onChange={(e) => {
+                              setPassword(e.target.value);
+                              if (emailError) setEmailError('');
+                            }}
+                            className="w-full pl-10 pr-11 py-3 rounded-2xl border border-slate-200 text-sm font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#16A34A]/20 focus:border-[#16A34A] transition-all bg-slate-50/50 focus:bg-white"
+                            required
+                          />
                           <button
-                            type="submit"
-                            disabled={isLoading}
-                            className="w-full mt-2 inline-flex items-center justify-center gap-2 rounded-2xl bg-[#0B3B82] hover:bg-[#082b5e] px-6 py-3.5 text-sm font-bold text-white shadow-md shadow-blue-950/10 transition active:scale-[0.99] disabled:opacity-50"
+                            type="button"
+                            onClick={() => setShowPassword(!showPassword)}
+                            className="absolute right-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1"
                           >
-                            {isLoading ? (
-                              <RefreshCw className="h-4 w-4 animate-spin text-emerald-400" />
-                            ) : (
-                              <>
-                                <span>Send Secure OTP</span>
-                                <ArrowRight className="h-4 w-4 text-emerald-400" />
-                              </>
-                            )}
+                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                           </button>
-                        </form>
-                      ) : (
-                        /* OTP Verification Screen */
-                        <form onSubmit={handleVerifyOtp} className="space-y-5">
-                          <div className="p-4 rounded-2xl bg-emerald-50/70 border border-emerald-200/80 flex items-center justify-between">
-                            <div>
-                              <p className="text-xs font-bold text-[#0B3B82]">
-                                OTP sent to +91 {phone || '9840123456'}
-                              </p>
-                              <p className="text-[11px] text-emerald-700">Enter code to enter {selectedRole} portal.</p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={() => setOtpSent(false)}
-                              className="text-xs font-bold text-[#16A34A] hover:underline px-2 py-1"
-                            >
-                              Edit
-                            </button>
-                          </div>
+                        </div>
+                        {emailError && (
+                          <p className="mt-1.5 text-xs font-bold text-red-600 flex items-center gap-1">
+                            <AlertCircle className="h-3.5 w-3.5" /> {emailError}
+                          </p>
+                        )}
+                      </div>
 
-                          {/* 4 Digit Boxes */}
-                          <div>
-                            <div className="flex justify-center gap-3 sm:gap-4">
-                              {otp.map((digit, idx) => (
-                                <input
-                                  key={idx}
-                                  id={`otp-input-${idx}`}
-                                  type="text"
-                                  inputMode="numeric"
-                                  maxLength={1}
-                                  value={digit}
-                                  onChange={(e) => handleOtpBoxChange(idx, e.target.value)}
-                                  className="w-13 h-14 sm:w-14 sm:h-14 text-center text-xl font-extrabold text-[#0B3B82] rounded-2xl border border-slate-200 bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#16A34A]/30 focus:border-[#16A34A] transition-all shadow-xs"
-                                />
-                              ))}
-                            </div>
-                          </div>
-
-                          <div className="flex items-center justify-center gap-2 pt-1">
-                            <span className="text-xs text-slate-500">Demo Code:</span>
-                            <button
-                              type="button"
-                              onClick={() => setOtp(['4', '8', '2', '9'])}
-                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-100 text-[#15803D] text-xs font-bold hover:bg-emerald-200 transition"
-                            >
-                              <Sparkles className="h-3 w-3" /> Auto-fill 4829
-                            </button>
-                          </div>
-
-                          <button
-                            type="submit"
-                            disabled={isLoading}
-                            className="w-full inline-flex items-center justify-center gap-2 rounded-2xl bg-[#16A34A] hover:bg-[#15803D] px-6 py-3.5 text-sm font-bold text-white shadow-md shadow-emerald-950/10 transition active:scale-[0.99] disabled:opacity-50"
-                          >
-                            {isLoading ? (
-                              <RefreshCw className="h-4 w-4 animate-spin text-white" />
-                            ) : (
-                              <>
-                                <span>Verify & Access {selectedRole.toUpperCase()} Console</span>
-                                <ArrowRight className="h-4 w-4" />
-                              </>
-                            )}
-                          </button>
-                        </form>
-                      )}
-                    </div>
-                  )}
-
-                  {/* TAB 2: EMAIL & PASSWORD / CREDENTIALS FLOW */}
-                  {activeTab === 'email' && (
+                      <button
+                        type="submit"
+                        disabled={isLoading}
+                        className="w-full mt-2 inline-flex items-center justify-center gap-2 rounded-2xl bg-[#16A34A] hover:bg-[#15803D] px-6 py-3.5 text-sm font-bold text-white shadow-md shadow-emerald-950/10 transition active:scale-[0.99] disabled:opacity-50"
+                      >
+                        {isLoading ? (
+                          <RefreshCw className="h-4 w-4 animate-spin text-white" />
+                        ) : (
+                          <>
+                            <span>Create Account &amp; Send Welcome Mail</span>
+                            <ArrowRight className="h-4 w-4" />
+                          </>
+                        )}
+                      </button>
+                    </form>
+                  ) : (
                     <form onSubmit={handleEmailLogin} className="space-y-4">
                       {selectedRole === 'doctor' && (
                         <div>
@@ -613,13 +589,19 @@ export default function PatientLoginPage({ onLoginSuccess, currentUser, onLogout
 
                       <div>
                         <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
-                          {selectedRole === 'admin' ? 'Administrator Email' : 'Professional Email Address'}
+                          {selectedRole === 'admin' ? 'Administrator Email' : selectedRole === 'doctor' ? 'Doctor Email Address' : 'Email Address'}
                         </label>
                         <div className="relative">
                           <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                           <input
                             type="email"
-                            placeholder={selectedRole === 'admin' ? 'admin@nayacura.internal' : 'dr.arvind@nayacura.clinic'}
+                            placeholder={
+                              selectedRole === 'admin'
+                                ? 'admin@nayacura.internal'
+                                : selectedRole === 'doctor'
+                                  ? 'dr.arvind@nayacura.clinic'
+                                  : 'you@example.com'
+                            }
                             value={email}
                             onChange={(e) => {
                               setEmail(e.target.value);

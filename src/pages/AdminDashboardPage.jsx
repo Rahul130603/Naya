@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
+  HELLO_EMAIL,
   approveApplication,
+  approveDirectDoctor,
   findAccountByEmail,
   listApplications,
   listMail,
@@ -74,8 +76,12 @@ export default function AdminDashboardPage({ user, onLogout }) {
   const [docPreview, setDocPreview] = useState(null);
   const [docUrls, setDocUrls] = useState({});
   const [storeProducts, setStoreProducts] = useState(() => listStoreProducts());
+  const [outboxEmails, setOutboxEmails] = useState(() => listMail());
 
-  useEffect(() => subscribeRegistry(() => setDoctorApplications(listApplications())), []);
+  useEffect(() => subscribeRegistry(() => {
+    setDoctorApplications(listApplications());
+    setOutboxEmails(listMail());
+  }), []);
   useEffect(() => subscribeStoreCatalog(setStoreProducts), []);
 
   const showAdminToast = (message) => {
@@ -179,9 +185,10 @@ export default function AdminDashboardPage({ user, onLogout }) {
   ]);
 
   const handleApproveDoctor = (doc) => {
+    const result = approveDirectDoctor(doc);
     setPendingDoctors(pendingDoctors.filter(d => d.id !== doc.id));
     setApprovedDoctors([{
-      id: doc.id,
+      id: result?.account?.id || doc.id,
       name: doc.name,
       regNo: doc.regNo,
       specialty: doc.specialty,
@@ -190,8 +197,20 @@ export default function AdminDashboardPage({ user, onLogout }) {
       satisfaction: '100%'
     }, ...approvedDoctors]);
     setSelectedDoctorForReview(null);
-    setAdminToast(`Doctor ${doc.name} (${doc.regNo}) successfully verified and activated!`);
-    setTimeout(() => setAdminToast(null), 4000);
+    if (result) {
+      setOutboxEmails(listMail());
+      setCopiedCredential(false);
+      setCredentialResult({ ...result, delivery: 'sending' });
+      sendApprovalEmails(result.account, result.mails.map((m) => m.id)).then((status) => {
+        setOutboxEmails(listMail());
+        setCredentialResult((current) => (
+          current && current.account?.id === result.account.id
+            ? { ...current, delivery: status.sent ? 'sent' : status.reason }
+            : current
+        ));
+      });
+    }
+    showAdminToast(`Approved ${doc.name} & sent User ID + password to ${doc.email} from ${HELLO_EMAIL}!`);
   };
 
   const handleApproveApplication = (application) => {
@@ -199,6 +218,7 @@ export default function AdminDashboardPage({ user, onLogout }) {
     const result = approveApplication(application.id);
     if (!result) return;
     setDoctorApplications(listApplications());
+    setOutboxEmails(listMail());
     setApprovedDoctors((current) => [{
       id: result.account.id,
       name: result.account.name,
@@ -210,13 +230,15 @@ export default function AdminDashboardPage({ user, onLogout }) {
     }, ...current]);
     setCopiedCredential(false);
     setCredentialResult({ ...result, delivery: 'sending' });
-    sendApprovalEmails(result.account).then((status) => {
+    sendApprovalEmails(result.account, result.mails.map((m) => m.id)).then((status) => {
+      setOutboxEmails(listMail());
       setCredentialResult((current) => (
         current && current.account?.id === result.account.id
           ? { ...current, delivery: status.sent ? 'sent' : status.reason }
           : current
       ));
     });
+    showAdminToast(`Approved ${result.account.name} & sending User ID (${result.account.id}) + password to ${result.account.email}!`);
   };
 
   const handleRejectApplication = (application) => {
@@ -917,6 +939,63 @@ export default function AdminDashboardPage({ user, onLogout }) {
                   ))}
                 </div>
               </div>
+
+              {/* Dispatched Onboarding & Welcome Emails Log */}
+              <div className="mt-6 rounded-2xl bg-white border border-[#DCE7F6] shadow-sm overflow-hidden">
+                <div className="p-4 bg-[#F8FBFF] border-b border-[#DCE7F6] flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-2 text-xs font-extrabold text-[#0B3B82]">
+                    <Mail className="h-4 w-4 text-[#16A34A]" />
+                    <span>Dispatched Welcome &amp; Credential Emails ({outboxEmails.length})</span>
+                  </div>
+                  <span className="text-[11px] font-bold text-[#15803D] bg-emerald-50 border border-emerald-200 rounded-full px-2.5 py-0.5">
+                    Sender: {HELLO_EMAIL}
+                  </span>
+                </div>
+                {outboxEmails.length ? (
+                  <div className="divide-y divide-slate-100 max-h-96 overflow-y-auto">
+                    {outboxEmails.slice(0, 12).map((mail) => (
+                      <div key={mail.id} className="p-4 text-xs space-y-1.5 hover:bg-slate-50/60 transition">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <span className="font-extrabold text-[#0B3B82]">{mail.subject}</span>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${
+                              mail.deliveryStatus === 'sent'
+                                ? 'bg-emerald-100 text-[#15803D]'
+                                : mail.deliveryStatus === 'preview'
+                                  ? 'bg-blue-100 text-[#0B3B82]'
+                                  : 'bg-amber-100 text-amber-800'
+                            }`}>
+                              {mail.deliveryStatus === 'sent'
+                                ? 'Sent via SMTP'
+                                : mail.deliveryStatus === 'preview'
+                                  ? 'Test Preview'
+                                  : 'Outbox Only (Configure SMTP)'}
+                            </span>
+                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-600">
+                              {mail.type}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-500">
+                          <span>From: <strong>{mail.from || HELLO_EMAIL}</strong> → To: <strong>{mail.to}</strong></span>
+                          {mail.previewUrl && (
+                            <a href={mail.previewUrl} target="_blank" rel="noreferrer" className="font-bold text-[#0B3B82] underline hover:text-[#16A34A]">
+                              Open Email Preview →
+                            </a>
+                          )}
+                        </div>
+                        <pre className="whitespace-pre-wrap font-sans text-[11px] text-slate-600 bg-slate-50 rounded-xl p-2.5 border border-slate-100">
+                          {mail.body}
+                        </pre>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="p-5 text-xs text-slate-500">
+                    Welcome emails (patient/doctor registration) and doctor credential emails sent from {HELLO_EMAIL} appear here.
+                  </p>
+                )}
+              </div>
             </div>
           )}
 
@@ -1335,12 +1414,12 @@ export default function AdminDashboardPage({ user, onLogout }) {
             }`}>
               <Mail className="mt-0.5 h-4 w-4 shrink-0" />
               <span>
-                {credentialResult.delivery === 'sent' && `Both emails sent from supportnayacura@gmail.com to ${credentialResult.account.email}.`}
-                {credentialResult.delivery === 'sending' && `Sending both emails from supportnayacura@gmail.com to ${credentialResult.account.email}…`}
-                {credentialResult.delivery === 'preview' && 'Preview of the emails that were sent at approval time.'}
-                {credentialResult.delivery === 'not-configured' && 'Email service is not configured yet — showing a preview only. Add SMTP details to the rooms service to deliver real emails.'}
-                {credentialResult.delivery === 'failed' && 'SMTP delivery failed. Verify the Gmail app password and SMTP settings on the rooms service.'}
-                {credentialResult.delivery === 'unreachable' && 'Rooms service unreachable — emails were not sent. Check the service URL and redeploy.'}
+                {credentialResult.delivery === 'sent' && `Both emails sent from ${HELLO_EMAIL} to ${credentialResult.account.email}.`}
+                {credentialResult.delivery === 'sending' && `Sending both emails from ${HELLO_EMAIL} to ${credentialResult.account.email}…`}
+                {credentialResult.delivery === 'preview' && `Preview of the emails dispatched from ${HELLO_EMAIL} at approval time.`}
+                {credentialResult.delivery === 'not-configured' && `Email relay preview (${HELLO_EMAIL} → ${credentialResult.account.email}). Configure SMTP to send externally, or copy the issued login email & password below.`}
+                {credentialResult.delivery === 'failed' && `SMTP delivery failed. Verify SMTP settings to deliver from ${HELLO_EMAIL}.`}
+                {credentialResult.delivery === 'unreachable' && 'Mail relay unreachable — showing issued credentials and email preview below.'}
               </span>
             </div>
 

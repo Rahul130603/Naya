@@ -185,7 +185,7 @@ export function LoginPortal({ role }: { role: Role }) {
       <div className="mt-3 flex items-start gap-3 rounded-2xl border border-lavender/15 bg-lavender/[0.04] p-2.5">
         <Sparkles className="mt-0.5 h-4 w-4 shrink-0 text-lavender" />
         <div className="min-w-0 flex-1">
-          <p className="font-sans text-[10px] font-semibold text-ivory">Demo account</p>
+          <p className="font-sans text-[10px] font-semibold text-ivory">Quick sign-in</p>
           <p className="mt-0.5 break-all font-body text-[9.5px] text-mauve">
             {config.demoEmail} · Nayacura@2026
           </p>

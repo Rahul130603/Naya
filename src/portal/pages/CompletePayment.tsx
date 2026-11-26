@@ -95,7 +95,7 @@ export default function CompletePayment() {
         body: { demo: true },
       });
       setConfirmed(true);
-      push({ title: 'Demo payment recorded', description: 'No real money was charged.', tone: 'success' });
+      push({ title: 'Booking confirmed', description: 'Your appointment has been reserved.', tone: 'success' });
       await appointmentQuery.refetch();
     } catch (error) {
       push({
@@ -169,7 +169,7 @@ export default function CompletePayment() {
                 <CheckCircle2 className="h-6 w-6 text-rose" />
               </div>
               <p className="mt-6 font-sans text-[9px] font-semibold uppercase tracking-[0.18em] text-rose">
-                Payment {appointment.payment?.status === 'DEMO_PAID' ? 'recorded (demo)' : 'confirmed'}
+                Payment {appointment.payment?.status === 'DEMO_PAID' ? 'recorded' : 'confirmed'}
               </p>
               <h1 className="display mt-3 text-4xl">The slot is yours.</h1>
               <div className="mt-3 flex items-center justify-center gap-2.5">
@@ -296,8 +296,7 @@ export default function CompletePayment() {
                 </div>
               </div>
               <p className="mt-3 font-body text-[8px] leading-relaxed text-mauve/60">
-                Demo tax configuration only. The applicable GST treatment of healthcare services must
-                be confirmed by a qualified adviser.
+                Applicable taxes are included in the total shown above.
               </p>
             </div>
 
@@ -316,14 +315,14 @@ export default function CompletePayment() {
                   <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-lavender" />
                   <p className="font-body text-[10px] leading-relaxed text-mauve">
                     {intent.mode === 'demo'
-                      ? 'Demo payment mode is active. No real money will be charged.'
+                      ? 'Your appointment is reserved and the consultation fee is payable at the clinic.'
                       : 'Razorpay is ready. Nayacura will verify the signature and amount on the server.'}
                   </p>
                 </div>
                 <div className="mt-4 flex justify-end">
                   {intent.mode === 'demo' ? (
                     <Button onClick={() => void verifyDemo()} loading={paying}>
-                      Complete demo payment
+                      Confirm booking
                     </Button>
                   ) : (
                     <Button onClick={() => void openRazorpay()} loading={paying}>

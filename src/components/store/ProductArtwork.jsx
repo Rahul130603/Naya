@@ -7,7 +7,7 @@ export default function ProductArtwork({ product, className = '' }) {
   const isTube = product.kind === 'tube';
   return (
     <div className={`overflow-hidden ${className}`} style={{ background: product.background }}>
-      <svg viewBox="0 0 360 245" role="img" aria-label={`${product.title} illustrative packaging`} className="h-full w-full">
+      <svg viewBox="0 0 360 245" role="img" aria-label={`${product.title} packaging`} className="h-full w-full">
         <defs>
           <linearGradient id={`${id}-body`} x1="0" x2="1"><stop stopColor="#E4E8E4" /><stop offset=".28" stopColor="#FFF" /><stop offset=".75" stopColor="#FAFCFA" /><stop offset="1" stopColor="#DBE2DC" /></linearGradient>
           <radialGradient id={`${id}-shadow`}><stop stopColor="#173B2C" stopOpacity=".15" /><stop offset="1" stopColor="#173B2C" stopOpacity="0" /></radialGradient>
@@ -25,7 +25,6 @@ export default function ProductArtwork({ product, className = '' }) {
           <text x="180" y={isJar ? 167 : 147} textAnchor="middle" fill={isJar ? product.color : '#FFF'} fontSize="6.2" fontFamily="system-ui" fontWeight="600" letterSpacing=".8">{product.label}</text>
           {!isJar && <text x="180" y="165" textAnchor="middle" fill="#FFF" fillOpacity=".85" fontSize="5.5" fontFamily="system-ui">PRIVATE WELLNESS</text>}
         </g>
-        <text x="180" y="236" textAnchor="middle" fill={product.color} fillOpacity=".55" fontSize="8" fontFamily="system-ui">Illustrative packaging</text>
       </svg>
     </div>
   );

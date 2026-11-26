@@ -1,6 +1,11 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
 import { env } from '../config/env';
+import {
+  sendDoctorApplicationReceived,
+  sendDoctorCredentialsEmail,
+  sendPatientWelcomeEmail,
+} from '../services/mailer';
 
 type Role = 'doctor' | 'patient';
 type SignalType = 'offer' | 'answer' | 'candidate';
@@ -91,6 +96,47 @@ function readRole(value: unknown): Role | null {
 }
 
 export const demoRoomsRouter = Router();
+
+demoRoomsRouter.post('/notify/welcome', limiter, async (req, res) => {
+  const to = typeof req.body?.to === 'string' ? req.body.to.trim() : '';
+  const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+  const role = req.body?.role === 'doctor' ? 'doctor' : 'patient';
+  const applicationId = typeof req.body?.applicationId === 'string' ? req.body.applicationId.trim() : undefined;
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to) || !name) {
+    res.status(400).json({ sent: false, message: 'Valid email and name are required.' });
+    return;
+  }
+  const result = role === 'doctor'
+    ? await sendDoctorApplicationReceived(to, name, applicationId)
+    : await sendPatientWelcomeEmail(to, name);
+  res.json({
+    sent: result.delivered,
+    from: env.SMTP_FROM,
+    mode: result.mode,
+    reason: result.reason,
+    previewUrl: result.previewUrl,
+  });
+});
+
+demoRoomsRouter.post('/notify/doctor-approved', limiter, async (req, res) => {
+  const to = typeof req.body?.to === 'string' ? req.body.to.trim() : '';
+  const name = typeof req.body?.name === 'string' ? req.body.name.trim() : '';
+  const doctorId = typeof req.body?.doctorId === 'string' ? req.body.doctorId.trim() : '';
+  const password = typeof req.body?.password === 'string' ? req.body.password : '';
+  const regNo = typeof req.body?.regNo === 'string' ? req.body.regNo.trim() : '';
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to) || !name || !doctorId || !password) {
+    res.status(400).json({ sent: false, message: 'Invalid notification payload.' });
+    return;
+  }
+  const result = await sendDoctorCredentialsEmail({ to, name, doctorId, password, regNo });
+  res.json({
+    sent: result.delivered,
+    from: env.SMTP_FROM,
+    mode: result.mode,
+    reason: result.reason,
+    previewUrl: result.previewUrl,
+  });
+});
 
 demoRoomsRouter.get('/:code', limiter, (req, res) => {
   const { code } = req.params;

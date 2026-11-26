@@ -309,7 +309,7 @@ export default function ConsultationRoom() {
     connection === 'connected'
       ? tokenInfo?.provider === 'LIVEKIT'
         ? 'Live · encrypted'
-        : 'Demo room · local preview'
+        : 'Consultation room · local preview'
       : connection === 'reconnecting'
         ? 'Reconnecting…'
         : connection === 'denied'
@@ -447,7 +447,7 @@ export default function ConsultationRoom() {
                         <Link to="/legal/teleconsultation-consent" target="_blank" className="text-lavender underline">
                           Teleconsultation Consent
                         </Link>
-                        . I understand this demo room may connect only a local preview.
+                        . I understand this room may connect only a local preview.
                       </span>
                     </label>
 
@@ -494,7 +494,7 @@ export default function ConsultationRoom() {
                         <p className="mt-1 font-sans text-[10px] text-mauve">{otherRole}</p>
                         <span className="mt-4 inline-flex items-center gap-2 rounded-full border border-white/10 bg-midnight/50 px-3 py-1.5 font-body text-[9px] text-mauve backdrop-blur-md">
                           <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-rose" />
-                          {tokenInfo?.provider === 'LIVEKIT' ? 'Waiting for participant video' : 'Demo room · local preview only'}
+                          {tokenInfo?.provider === 'LIVEKIT' ? 'Waiting for participant video' : 'Consultation room · local preview only'}
                         </span>
                       </div>
                     </div>
@@ -713,7 +713,7 @@ export default function ConsultationRoom() {
                 <ArrowLeft className="h-3 w-3" /> My appointments
               </Link>
               <span className="font-body text-[8px] uppercase tracking-[0.14em] text-mauve/40">
-                Demo teleconsultation
+                Teleconsultation
               </span>
             </div>
           </aside>

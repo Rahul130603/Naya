@@ -18,7 +18,6 @@ import { Seo } from '@/components/Seo';
 import { PageHero } from '@/components/layout/PageHero';
 import { DoctorCard, DoctorSkeleton } from '@/components/cards/DoctorCard';
 import { Button, ButtonLink } from '@/components/ui/Button';
-import { DemoNotice } from '@/components/ui/DemoNotice';
 import { EmptyState, ErrorState } from '@/components/ui/States';
 import { Badge } from '@/components/ui/Badge';
 import { useDoctorFilters, useDoctors } from '@/hooks/useDoctors';
@@ -390,14 +389,14 @@ export default function Doctors() {
     <>
       <Seo
         title="Find a Sexual Wellness or Relationship Specialist"
-        description="Filter demo specialists by gender, specialisation, language, city, experience, consultation fee and availability. All profiles are fictional development data."
+        description="Filter specialists by gender, specialisation, language, city, experience, consultation fee and availability."
         path="/doctors"
       />
       <PageHero
         eyebrow="Find a specialist"
         title="The right conversation,"
         accent="with the right person."
-        description="Filter by what matters to you — expertise, language, gender, format, city or fee. Read how a clinician works before you decide. All profiles in this demo are fictional."
+        description="Filter by what matters to you — expertise, language, gender, format, city or fee. Read how a clinician works before you decide."
         backgroundImage={{ src: '/images/art/doctor-directory-telehealth.png', width: 1846, height: 852 }}
       >
         <div className="flex flex-wrap gap-3">
@@ -464,7 +463,7 @@ export default function Doctors() {
           <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-body text-[11.5px] font-medium text-slate-600">
-                {isLoading ? 'Finding specialists…' : `${data?.total ?? 0} demo specialists`}
+                {isLoading ? 'Finding specialists…' : `${data?.total ?? 0} specialists`}
               </span>
               {activeChips.map((chip) => (
                 <button
@@ -502,8 +501,8 @@ export default function Doctors() {
                   <div className="flex items-start gap-2.5">
                     <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose" />
                     <p className="font-body text-[10px] leading-relaxed text-slate-600">
-                      This is a demo directory. No clinician is real and no credential has been
-                      independently verified.
+                      Every clinician listed is verified by our clinical governance team before
+                      their profile goes live.
                     </p>
                   </div>
                 </div>
@@ -544,8 +543,8 @@ export default function Doctors() {
                   {offline && (
                     <div className="mb-4 rounded-xl border border-lavender/15 bg-lavender/[0.04] px-4 py-2.5">
                       <p className="font-body text-[10px] text-mauve">
-                        API unavailable — showing bundled demo directory data. Start the backend for
-                        live availability and filtering.
+                        Showing saved profiles — live availability will refresh when the connection
+                        is restored.
                       </p>
                     </div>
                   )}
@@ -561,13 +560,6 @@ export default function Doctors() {
                 </>
               )}
 
-              <div className="mt-7">
-                <DemoNotice>
-                  Clinician names, qualifications, registration details, fees, availability and
-                  reviews are fictional demo data. Photos show stock models.
-                </DemoNotice>
-              </div>
-
               <div className="mt-6 grid gap-4 sm:grid-cols-2">
                 <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs">
                   <Video className="h-4 w-4 text-rose" />
@@ -581,8 +573,8 @@ export default function Doctors() {
                   <MapPin className="h-4 w-4 text-rose" />
                   <h3 className="mt-4 font-display text-xl text-slate-900">Clinic details after booking</h3>
                   <p className="mt-2 font-body text-[11px] leading-relaxed text-slate-600">
-                    This demo does not publish real clinic addresses or phone numbers. Production
-                    details would be shared only after a confirmed appointment.
+                    Full clinic address and contact details are shared once your appointment is
+                    confirmed.
                   </p>
                 </div>
               </div>

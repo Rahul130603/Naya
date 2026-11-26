@@ -61,12 +61,23 @@ const schema = z.object({
   NAYA_KNOWLEDGE_FILE: z.string().trim().optional(),
   LLM_BASE_URL: z.string().default('https://api.openai.com/v1'),
   LLM_MODEL: z.string().default('gpt-4o-mini'),
-  SMTP_HOST: z.string().optional(),
+  TWILIO_ACCOUNT_SID: z.string().trim().optional(),
+  TWILIO_AUTH_TOKEN: z.string().trim().optional(),
+  TWILIO_SMS_FROM: z.string().trim().optional(),
+  TWILIO_WHATSAPP_FROM: z.string().trim().optional(),
+  TWILIO_API_BASE: z.string().trim().default('https://api.twilio.com'),
+  FAST2SMS_API_KEY: z.string().trim().optional(),
+  FAST2SMS_ROUTE: z.string().trim().default('q'),
+  WHATSAPP_CLOUD_TOKEN: z.string().trim().optional(),
+  WHATSAPP_PHONE_NUMBER_ID: z.string().trim().optional(),
+  WHATSAPP_TEMPLATE_NAME: z.string().trim().optional(),
+  WHATSAPP_TEMPLATE_LANG: z.string().trim().default('en'),
+  SMTP_HOST: z.string().trim().optional(),
   SMTP_PORT: numberFromEnv(587),
-  SMTP_USER: z.string().optional(),
-  SMTP_PASS: z.string().optional(),
-  SMTP_FROM: z.string().default('Nayacura <no-reply@nayacura.example>'),
-  SUPPORT_EMAIL: z.string().default('support@nayacura.com'),
+  SMTP_USER: z.string().trim().optional(),
+  SMTP_PASS: z.string().trim().optional(),
+  SMTP_FROM: z.string().trim().default('Nayacura <hello@nayacura.com>'),
+  SUPPORT_EMAIL: z.string().trim().default('support@nayacura.com'),
 });
 
 const parsed = schema.safeParse(process.env);
@@ -100,6 +111,17 @@ export const env = {
   ),
   llmConfigured: Boolean(raw.LLM_API_KEY),
   smtpConfigured: Boolean(raw.SMTP_HOST && raw.SMTP_USER && raw.SMTP_PASS),
+  // Fast2SMS (India) or Twilio provides SMS delivery.
+  fast2smsConfigured: Boolean(raw.FAST2SMS_API_KEY),
+  // Meta WhatsApp Cloud API (or Twilio) provides WhatsApp delivery.
+  metaWhatsappConfigured: Boolean(raw.WHATSAPP_CLOUD_TOKEN && raw.WHATSAPP_PHONE_NUMBER_ID),
+  smsConfigured: Boolean(
+    raw.FAST2SMS_API_KEY || (raw.TWILIO_ACCOUNT_SID && raw.TWILIO_AUTH_TOKEN && raw.TWILIO_SMS_FROM),
+  ),
+  whatsappConfigured: Boolean(
+    (raw.WHATSAPP_CLOUD_TOKEN && raw.WHATSAPP_PHONE_NUMBER_ID) ||
+      (raw.TWILIO_ACCOUNT_SID && raw.TWILIO_AUTH_TOKEN && raw.TWILIO_WHATSAPP_FROM),
+  ),
   encryptionKey: raw.DATA_ENCRYPTION_KEY || 'nayacura-development-only-key-do-not-use-in-production',
 };
 

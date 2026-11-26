@@ -21,17 +21,26 @@ export function Modal({
 }) {
   const panelRef = useRef<HTMLDivElement>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
+  // Callers commonly pass an inline arrow for onClose, so its identity changes on
+  // every parent render. Reading it through a ref keeps this effect stable while
+  // typing; re-running it would re-focus the panel and dismiss the mobile keyboard.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
 
   useEffect(() => {
     if (!open) return;
     previouslyFocused.current = document.activeElement as HTMLElement;
     document.body.style.overflow = 'hidden';
     const timer = window.setTimeout(() => {
-      panelRef.current?.querySelector<HTMLElement>('button, input, select, textarea, a')?.focus();
+      const panel = panelRef.current;
+      if (!panel || panel.contains(document.activeElement)) return;
+      panel.querySelector<HTMLElement>('button, input, select, textarea, a')?.focus();
     }, 50);
 
     function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') onCloseRef.current();
       if (e.key === 'Tab' && panelRef.current) {
         const focusables = panelRef.current.querySelectorAll<HTMLElement>(
           'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
@@ -55,7 +64,7 @@ export function Modal({
       window.clearTimeout(timer);
       previouslyFocused.current?.focus();
     };
-  }, [open, onClose]);
+  }, [open]);
 
   return createPortal(
     <AnimatePresence>

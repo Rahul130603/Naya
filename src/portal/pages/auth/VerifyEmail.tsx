@@ -77,8 +77,8 @@ export default function VerifyEmail() {
           </div>
         ) : null}
         <p className="mt-8 border-t border-white/[0.07] pt-5 font-body text-[9px] text-mauve/50">
-          In local demo mode without SMTP configured, verification links are printed in the API
-          terminal.
+          Didn’t receive the email? Check your spam folder, or request a new verification link from
+          your account settings.
         </p>
       </div>
     </>

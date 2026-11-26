@@ -2,6 +2,10 @@ import { useEffect, useState } from 'react';
 import { ArrowLeft, ArrowRight, CheckCircle2, Globe2, MapPin, ShieldCheck, Sunrise, Sun, Sunset } from 'lucide-react';
 import { DOCTORS } from '../data/healthcareData';
 import { BOOKING_SERVICES } from '../data/bookingServices';
+import {
+  formatDisplayPhone,
+  submitBookingNotification,
+} from '../lib/bookingMessages';
 
 const TIME_ZONE = 'Asia/Kolkata';
 const dateLabel = date => date.toLocaleDateString('en-IN', { timeZone: TIME_ZONE, day: 'numeric', month: 'short', year: 'numeric' });
@@ -19,7 +23,10 @@ export default function AppointmentScheduler({ onBookingSuccess, onClose }) {
   const [selectedSlot, setSelectedSlot] = useState('');
   const [step, setStep] = useState('schedule');
   const [booking, setBooking] = useState(null);
-  const [patient, setPatient] = useState({ name: '', phone: '', reason: '' });
+  const [patient, setPatient] = useState({ name: '', email: '', phone: '', reason: '' });
+  const [smsConsent, setSmsConsent] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [delivery, setDelivery] = useState(null);
   const [now, setNow] = useState(() => new Date());
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 30000);
@@ -51,20 +58,58 @@ export default function AppointmentScheduler({ onBookingSuccess, onClose }) {
     { title: 'Evening', Icon: Sunset, slots: allSlots.filter(slot => minutes(slot) >= 1020) },
   ];
 
-  const confirmBooking = event => {
+  const confirmBooking = async (event) => {
     event.preventDefault();
-    if (!available.includes(selectedSlot) || booking) return;
+    if (!available.includes(selectedSlot) || booking || sending) return;
+    setSending(true);
+    const dayStr = dateLabel(dates[dayIndex]);
+    let reference = '';
+    let serverPhone = '';
+
+    if (smsConsent) {
+      try {
+        const { ok, data } = await submitBookingNotification({
+          fullName: patient.name.trim(),
+          ...(patient.email.trim() ? { email: patient.email.trim() } : {}),
+          phone: patient.phone,
+          doctorName: doctor.name,
+          specialty: doctor.specialty,
+          clinicName: doctor.clinicName,
+          clinicAddress: doctor.clinicAddress,
+          mode: 'IN_PERSON',
+          dateLabel: dayStr,
+          slotLabel: selectedSlot,
+          timezone: TIME_ZONE,
+          feeRupees: doctor.fee,
+          channels: ['SMS', 'WHATSAPP'],
+          consent: true,
+        });
+        if (ok) {
+          reference = data.reference || '';
+          serverPhone = data.phone || '';
+        }
+      } catch {
+        // Offline / backend unreachable: still complete the local booking.
+      }
+    }
+
+    const fallbackId = `NC-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
+    const finalId = reference || fallbackId;
     const newBooking = {
-      id: `NC-${crypto.randomUUID().slice(0, 8).toUpperCase()}`,
+      id: finalId,
       doctorName: doctor.name, doctorSpecialty: doctor.specialty, doctorPhoto: doctor.photo,
       serviceId: service.id, serviceName: service.name,
       clinicName: doctor.clinicName, clinicAddress: doctor.clinicAddress,
-      day: dateLabel(dates[dayIndex]), timeSlot: selectedSlot, timeZone: TIME_ZONE,
-      patientName: patient.name.trim(), patientPhone: patient.phone, reason: patient.reason.trim(),
+      day: dayStr, timeSlot: selectedSlot, timeZone: TIME_ZONE,
+      patientName: patient.name.trim(), patientPhone: serverPhone || patient.phone, reason: patient.reason.trim(),
       fee: doctor.fee, type: 'clinic', status: 'Confirmed',
     };
+    setDelivery({
+      phone: serverPhone || formatDisplayPhone(patient.phone),
+    });
     onBookingSuccess(newBooking);
     setBooking(newBooking);
+    setSending(false);
     setStep('success');
   };
 
@@ -86,7 +131,6 @@ export default function AppointmentScheduler({ onBookingSuccess, onClose }) {
           <p className="mt-5 hidden sm:flex items-start gap-2 text-sm leading-relaxed text-slate-500"><MapPin className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />{doctor.clinicName}, {doctor.city}</p>
           <details className="mt-3 text-sm text-slate-500 sm:hidden"><summary className="cursor-pointer py-2 font-medium text-brand-navy">View clinic details</summary><p className="mt-1">{doctor.clinicName}</p><p>{doctor.clinicAddress}</p></details>
           <p className="mt-4 font-semibold text-brand-navy">₹{doctor.fee} <span className="text-sm font-normal text-slate-500">· Pay at clinic</span></p>
-          <p className="mt-3 sm:mt-6 text-xs leading-relaxed text-slate-400">Demo availability. Bookings are saved for this session only.</p>
           <div className="hidden lg:block mt-8 pt-6 lg:mt-auto">
             {step === 'details' ? <button type="button" onClick={() => setStep('schedule')} className={`inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-[#1686E8] ${focusClass}`}><ArrowLeft className="h-4 w-4" /> Back</button>
               : <button type="button" onClick={onClose} className={`inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-[#1686E8] ${focusClass}`}><ArrowLeft className="h-4 w-4" /> Back</button>}
@@ -129,21 +173,30 @@ export default function AppointmentScheduler({ onBookingSuccess, onClose }) {
           {step === 'details' && <form onSubmit={confirmBooking} className="mx-auto w-full max-w-xl space-y-6">
             <div><h2 className="text-2xl font-semibold">Your booking details</h2><p className="mt-3 font-medium text-brand-navy">{service.name}</p><p className="mt-2 text-slate-500">{dateLabel(dates[dayIndex])} · {selectedSlot} · Asia/Kolkata</p></div>
             <label className="block text-sm font-medium">Patient name<input required autoComplete="name" maxLength={100} value={patient.name} onChange={e => setPatient({ ...patient, name: e.target.value })} pattern=".*\S.*" className={inputClass} /></label>
+            <label className="block text-sm font-medium">Email address <span className="text-slate-400">(optional — instant confirmation card)</span><input type="email" autoComplete="email" value={patient.email} onChange={e => setPatient({ ...patient, email: e.target.value })} className={inputClass} /></label>
             <label className="block text-sm font-medium">Mobile number (+91)<input required type="tel" autoComplete="tel-national" inputMode="numeric" pattern="[0-9]{10}" title="Enter a 10-digit mobile number" value={patient.phone} onChange={e => setPatient({ ...patient, phone: e.target.value.replace(/\D/g, '').slice(0, 10) })} className={inputClass} /></label>
             <label className="block text-sm font-medium">Reason for visit <span className="text-slate-400">(optional)</span><textarea rows={3} maxLength={1000} value={patient.reason} onChange={e => setPatient({ ...patient, reason: e.target.value })} className={inputClass} /></label>
+            <label className="flex items-start gap-2.5 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs font-medium text-slate-600">
+              <input type="checkbox" checked={smsConsent} onChange={e => setSmsConsent(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-brand-green" />
+              <span>Send my booking confirmation to this mobile number via SMS and WhatsApp (no clinical details shared).</span>
+            </label>
             <p className="text-sm text-slate-500">Consultation fee: ₹{doctor.fee}. Pay at the clinic.</p>
-            <button type="submit" className={`inline-flex min-h-12 w-full items-center justify-center gap-3 rounded-xl bg-brand-navy px-5 py-3 font-semibold text-white hover:bg-brand-navy-dark ${focusClass}`}>Confirm Appointment <ArrowRight className="h-5 w-5" /></button>
+            <button type="submit" disabled={sending} className={`inline-flex min-h-12 w-full items-center justify-center gap-3 rounded-xl bg-brand-navy px-5 py-3 font-semibold text-white hover:bg-brand-navy-dark disabled:opacity-60 ${focusClass}`}>{sending ? 'Confirming & sending...' : 'Confirm Appointment'} <ArrowRight className="h-5 w-5" /></button>
           </form>}
 
-          {step === 'success' && <div role="status" className="mx-auto my-auto w-full max-w-xl space-y-6 py-10">
-            <CheckCircle2 className="h-14 w-14 text-brand-green" />
-            <h2 className="text-3xl font-semibold">Appointment confirmed</h2>
-            <p className="text-slate-500">Your demo booking is now in My Bookings.</p>
-            <dl className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
-              {Object.entries({ 'Booking reference': booking.id, Service: booking.serviceName, Specialist: booking.doctorName, Patient: booking.patientName, 'Date & time': `${booking.day} · ${booking.timeSlot}`, 'Time zone': TIME_ZONE, Clinic: booking.clinicAddress, Fee: `₹${booking.fee} · Pay at clinic` }).map(([label, value]) => <div key={label}><dt className="text-xs text-slate-400">{label}</dt><dd className="mt-1 text-sm font-medium">{value}</dd></div>)}
-            </dl>
-            <button type="button" onClick={onClose} className={`inline-flex rounded-xl bg-brand-navy px-5 py-3 font-semibold text-white ${focusClass}`}>Done & Close</button>
-          </div>}
+          {step === 'success' && (
+              <div role="status" className="mx-auto my-auto w-full max-w-xl space-y-6 py-10">
+                <CheckCircle2 className="h-14 w-14 text-brand-green" />
+                <h2 className="text-3xl font-semibold">Appointment confirmed</h2>
+                <p className="text-slate-500">
+                  Booking for <strong>{formatDisplayPhone(delivery?.phone || booking.patientPhone)}</strong> saved in My Bookings.
+                </p>
+                <dl className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
+                  {Object.entries({ 'Booking reference': booking.id, Service: booking.serviceName, Specialist: booking.doctorName, Patient: booking.patientName, 'Date & time': `${booking.day} · ${booking.timeSlot}`, 'Time zone': TIME_ZONE, Clinic: booking.clinicAddress, Fee: `₹${booking.fee} · Pay at clinic` }).map(([label, value]) => <div key={label}><dt className="text-xs text-slate-400">{label}</dt><dd className="mt-1 text-sm font-medium">{value}</dd></div>)}
+                </dl>
+                <button type="button" onClick={onClose} className={`inline-flex rounded-xl bg-brand-navy px-5 py-3 font-semibold text-white ${focusClass}`}>Done & Close</button>
+              </div>
+          )}
         </div>
       </div>
     </section>

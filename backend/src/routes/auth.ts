@@ -33,7 +33,7 @@ import {
 } from '../utils/errors';
 import { hashToken, randomToken } from '../utils/crypto';
 import { audit } from '../utils/audit';
-import { sendDoctorApplicationReceived, sendPasswordReset, sendVerificationEmail } from '../services/mailer';
+import { sendDoctorApplicationReceived, sendPasswordReset, sendPatientWelcomeEmail, sendVerificationEmail } from '../services/mailer';
 import { supportReference } from '../utils/crypto';
 import { clearAuthCookies } from '../middleware/csrf';
 import { discardApplicationDocument, storeApplicationDocument } from '../services/clinicianApplicationDocuments';
@@ -97,7 +97,7 @@ authRouter.post('/doctor-applications', formLimiter, validate(doctorApplicationS
     throw error;
   }
   await audit({ req, actorId: user.id, actorRole: 'DOCTOR', action: 'DOCTOR_APPLICATION_SUBMITTED', entityType: 'User', entityId: user.id });
-  const receipt = await sendDoctorApplicationReceived(user.email);
+  const receipt = await sendDoctorApplicationReceived(user.email, user.name);
   res.status(201).json({ status: 'PENDING', acknowledgementSent: receipt.delivered });
 }));
 
@@ -158,6 +158,7 @@ authRouter.post(
       },
     });
     const verifyUrl = `${env.APP_URL}/verify-email?token=${verificationToken}`;
+    const welcomeResult = await sendPatientWelcomeEmail(user.email, user.name);
     await sendVerificationEmail(user.email, verifyUrl);
     if (env.isDemo && !env.smtpConfigured) {
       console.info(`[nayacura demo] Verification link for local testing: ${verifyUrl}`);
@@ -176,6 +177,8 @@ authRouter.post(
     const payload = await userPayload(user.id);
     res.status(201).json({
       user: payload,
+      welcomeEmailSent: welcomeResult.delivered,
+      welcomeEmailPreviewUrl: welcomeResult.previewUrl,
       message:
         'Your private account has been created. Please verify your email when you can — you can still explore your dashboard.',
       demoVerificationLink: env.isDemo && !env.smtpConfigured ? verifyUrl : undefined,

@@ -4,30 +4,46 @@ import { X } from 'lucide-react';
 export default function Modal({ isOpen, onClose, title, subtitle, children, maxWidth = 'max-w-2xl' }) {
   const panelRef = useRef(null);
   const titleId = useId();
+  // Callers usually pass an inline arrow for onClose, so a new identity arrives on
+  // every parent render. Reading it through a ref keeps the open/close effect below
+  // stable while typing: re-running it would blur the focused field and dismiss the
+  // mobile keyboard after each character.
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
+
   useEffect(() => {
     if (!isOpen) return;
     const previousFocus = document.activeElement;
     const previousOverflow = document.body.style.overflow;
     const handleKeyDown = (e) => {
-      if (e.key === 'Escape') onClose();
+      if (e.key === 'Escape') onCloseRef.current?.();
       if (e.key === 'Tab') {
-        const items = panelRef.current?.querySelectorAll('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex="0"]');
+        const panel = panelRef.current;
+        if (!panel) return;
+        const items = panel.querySelectorAll('button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex="0"]');
         if (!items?.length) return;
         const first = items[0];
         const last = items[items.length - 1];
-        if (e.shiftKey && (document.activeElement === first || document.activeElement === panelRef.current)) { e.preventDefault(); last.focus(); }
+        if (e.shiftKey && (document.activeElement === first || document.activeElement === panel)) { e.preventDefault(); last.focus(); }
         else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
       }
     };
     document.body.style.overflow = 'hidden';
-    panelRef.current?.focus();
+    // Move focus into the dialog once, and only when focus is not already inside it.
+    if (panelRef.current && !panelRef.current.contains(document.activeElement)) {
+      panelRef.current.focus({ preventScroll: true });
+    }
     window.addEventListener('keydown', handleKeyDown);
     return () => {
       document.body.style.overflow = previousOverflow;
       window.removeEventListener('keydown', handleKeyDown);
-      previousFocus?.focus();
+      if (previousFocus && typeof previousFocus.focus === 'function' && document.contains(previousFocus)) {
+        previousFocus.focus({ preventScroll: true });
+      }
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 

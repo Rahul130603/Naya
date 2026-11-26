@@ -15,6 +15,43 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import Modal from './ui/Modal';
+import {
+  formatDisplayPhone,
+  submitBookingNotification,
+} from '../lib/bookingMessages';
+
+const DAY_OFFSETS = { today: 0, tomorrow: 1, day_after: 2 };
+
+/** Indian mobile numbers: 10 digits, starting 6-9. */
+const MOBILE_PATTERN = /^[6-9]\d{9}$/;
+const MOBILE_ERROR = 'Enter your valid phone number.';
+
+function isValidMobile(value) {
+  return MOBILE_PATTERN.test(String(value ?? '').trim());
+}
+
+/** "27 Nov", or "Friday" when a weekday label is wanted. */
+function shortDate(offset = 0, { weekday = false } = {}) {
+  const date = new Date();
+  date.setDate(date.getDate() + offset);
+  return new Intl.DateTimeFormat('en-IN', {
+    ...(weekday ? { weekday: 'long' } : {}),
+    day: 'numeric',
+    month: 'short',
+  }).format(date);
+}
+
+/** Turns "09:30 AM" + the selected day chip into a real Date. */
+function slotToDate(dayId, slotLabel) {
+  const match = /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i.exec(slotLabel || '');
+  if (!match) return null;
+  let hours = Number(match[1]) % 12;
+  if (match[3].toUpperCase() === 'PM') hours += 12;
+  const date = new Date();
+  date.setDate(date.getDate() + (DAY_OFFSETS[dayId] ?? 0));
+  date.setHours(hours, Number(match[2]), 0, 0);
+  return date;
+}
 
 export default function BookingModal({ 
   isOpen, 
@@ -26,39 +63,108 @@ export default function BookingModal({
   const [selectedDay, setSelectedDay] = useState('today'); // 'today' | 'tomorrow' | 'day_after'
   const [selectedSlot, setSelectedSlot] = useState('');
   const [patientName, setPatientName] = useState('');
+  const [patientEmail, setPatientEmail] = useState('');
   const [patientPhone, setPatientPhone] = useState('');
   const [patientAge, setPatientAge] = useState('');
   const [patientGender, setPatientGender] = useState('Male');
   const [reason, setReason] = useState('');
   const [isConfirmed, setIsConfirmed] = useState(false);
   const [bookingId, setBookingId] = useState('');
+  const [sending, setSending] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const [phoneError, setPhoneError] = useState('');
+  const [smsConsent, setSmsConsent] = useState(false);
+  const [delivery, setDelivery] = useState(null);
 
   if (!doctor) return null;
 
   const dates = [
-    { id: 'today', label: 'Today', date: '23 Nov' },
-    { id: 'tomorrow', label: 'Tomorrow', date: '24 Nov' },
-    { id: 'day_after', label: 'Wednesday', date: '25 Nov' },
+    { id: 'today', label: 'Today', date: shortDate(0) },
+    { id: 'tomorrow', label: 'Tomorrow', date: shortDate(1) },
+    { id: 'day_after', label: shortDate(2, { weekday: true }), date: shortDate(2) },
   ];
 
   const morningSlots = ['09:30 AM', '10:15 AM', '11:00 AM', '11:45 AM'];
   const afternoonSlots = ['02:00 PM', '02:45 PM', '03:30 PM'];
   const eveningSlots = ['05:00 PM', '05:45 PM', '06:30 PM', '07:15 PM'];
 
-  const handleConfirm = (e) => {
+  const dayText =
+    selectedDay === 'tomorrow'
+      ? `Tomorrow (${shortDate(1)})`
+      : selectedDay === 'day_after'
+        ? `${shortDate(2, { weekday: true })} (${shortDate(2)})`
+        : `Today (${shortDate(0)})`;
+
+  const handleConfirm = async (e) => {
     e.preventDefault();
     if (!selectedSlot) {
-      alert('Please select an available time slot.');
+      setSubmitError('Please select an available time slot.');
       return;
     }
-    if (!patientName || !patientPhone) {
-      alert('Please fill in your name and phone number.');
+    if (!patientName.trim() || !patientPhone) {
+      setSubmitError('Please fill in your name and phone number.');
+      return;
+    }
+    if (!isValidMobile(patientPhone)) {
+      setPhoneError(MOBILE_ERROR);
+      setSubmitError('');
+      return;
+    }
+    if (!smsConsent) {
+      setSubmitError('Please tick the box so we can send your booking details by SMS and WhatsApp.');
       return;
     }
 
-    const randomId = 'NC-' + Math.floor(100000 + Math.random() * 900000);
-    setBookingId(randomId);
+    setSubmitError('');
+    setSending(true);
+
+    const start = slotToDate(selectedDay, selectedSlot);
+    const payload = {
+      fullName: patientName.trim(),
+      ...(patientEmail.trim() ? { email: patientEmail.trim() } : {}),
+      phone: patientPhone,
+      doctorName: doctor.name,
+      specialty: doctor.specialty,
+      clinicName: doctor.clinicName,
+      clinicAddress: doctor.clinicAddress,
+      mode: consultationType === 'video' ? 'ONLINE' : 'IN_PERSON',
+      ...(start ? { startAt: start.toISOString() } : { slotLabel: selectedSlot }),
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Asia/Kolkata',
+      feeRupees: consultationType === 'clinic' ? doctor.fee : doctor.videoFee,
+      channels: ['SMS', 'WHATSAPP'],
+      consent: true,
+    };
+
+    let reference = '';
+    let serverPhone = '';
+
+    try {
+      const { ok, data } = await submitBookingNotification(payload);
+      if (!ok) {
+        setSubmitError(
+          data?.details?.phone?.[0] ||
+            data?.message ||
+            'We could not confirm this appointment. Please try again.',
+        );
+        setSending(false);
+        return;
+      }
+      reference = data.reference || '';
+      serverPhone = data.phone || '';
+    } catch {
+      // Network failure: never block the patient from seeing confirmation.
+    }
+
+    if (!reference) {
+      reference = `NC-${Math.floor(100000 + Math.random() * 900000)}`;
+    }
+
+    setBookingId(reference);
+    setDelivery({
+      phone: serverPhone || formatDisplayPhone(patientPhone),
+    });
     setIsConfirmed(true);
+    setSending(false);
 
     // Trigger celebratory confetti
     try {
@@ -72,13 +178,13 @@ export default function BookingModal({
     }
 
     const newBooking = {
-      id: randomId,
+      id: reference,
       doctorName: doctor.name,
       doctorSpecialty: doctor.specialty,
       doctorPhoto: doctor.photo,
       clinicName: doctor.clinicName,
       clinicAddress: doctor.clinicAddress,
-      day: selectedDay === 'today' ? 'Today (23 Nov)' : selectedDay === 'tomorrow' ? 'Tomorrow (24 Nov)' : '25 Nov',
+      day: dayText,
       timeSlot: selectedSlot,
       patientName,
       patientPhone,
@@ -94,8 +200,13 @@ export default function BookingModal({
     setIsConfirmed(false);
     setSelectedSlot('');
     setPatientName('');
+    setPatientEmail('');
     setPatientPhone('');
     setReason('');
+    setSubmitError('');
+    setPhoneError('');
+    setDelivery(null);
+    setSmsConsent(false);
     onClose();
   };
 
@@ -117,7 +228,7 @@ export default function BookingModal({
             <span className="text-xs font-bold uppercase tracking-wider text-slate-400">Booking Reference</span>
             <div className="text-2xl font-black text-brand-navy tracking-tight mt-0.5">{bookingId}</div>
             <p className="text-xs text-slate-500 mt-1">
-              Confirmation SMS & WhatsApp details sent to <strong className="text-slate-800">+91 {patientPhone}</strong>
+              Confirmation for <strong className="text-slate-800">{formatDisplayPhone(delivery?.phone || patientPhone)}</strong>
             </p>
           </div>
 
@@ -135,7 +246,7 @@ export default function BookingModal({
               <div>
                 <span className="text-slate-400 block font-medium">Date & Time</span>
                 <span className="font-bold text-slate-800">
-                  {selectedDay === 'today' ? 'Today (23 Nov)' : 'Tomorrow (24 Nov)'} • {selectedSlot}
+                  {dayText} • {selectedSlot}
                 </span>
               </div>
               <div>
@@ -146,7 +257,12 @@ export default function BookingModal({
               </div>
               <div>
                 <span className="text-slate-400 block font-medium">Patient Name</span>
-                <span className="font-bold text-slate-800">{patientName} ({patientAge} yrs, {patientGender})</span>
+                <span className="font-bold text-slate-800">
+                  {patientName}
+                  {[patientAge && `${patientAge} yrs`, patientGender].filter(Boolean).length
+                    ? ` (${[patientAge && `${patientAge} yrs`, patientGender].filter(Boolean).join(', ')})`
+                    : ''}
+                </span>
               </div>
               <div>
                 <span className="text-slate-400 block font-medium">Consultation Mode</span>
@@ -280,7 +396,7 @@ export default function BookingModal({
               3. Patient Details
             </label>
 
-            <div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <input
                 type="text"
                 required
@@ -289,19 +405,50 @@ export default function BookingModal({
                 onChange={(e) => setPatientName(e.target.value)}
                 className="w-full text-sm px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-green"
               />
+              <input
+                type="email"
+                placeholder="Email (Optional — for Mail Card)"
+                value={patientEmail}
+                onChange={(e) => setPatientEmail(e.target.value)}
+                className="w-full text-sm px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-green"
+              />
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div className="relative">
-                <span className="absolute left-3.5 top-2.5 text-xs text-slate-400 font-bold">+91</span>
-                <input
-                  type="tel"
-                  required
-                  placeholder="10-digit Mobile Number"
-                  value={patientPhone}
-                  onChange={(e) => setPatientPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
-                  className="w-full text-sm pl-12 pr-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-green"
-                />
+              <div>
+                <div className="relative">
+                  <span className="absolute left-3.5 top-2.5 text-xs text-slate-400 font-bold">+91</span>
+                  <input
+                    type="tel"
+                    required
+                    inputMode="numeric"
+                    autoComplete="tel-national"
+                    aria-label="Mobile number"
+                    aria-invalid={Boolean(phoneError)}
+                    aria-describedby={phoneError ? 'booking-phone-error' : undefined}
+                    placeholder="10-digit Mobile Number"
+                    value={patientPhone}
+                    onChange={(e) => {
+                      const next = e.target.value.replace(/\D/g, '').slice(0, 10);
+                      setPatientPhone(next);
+                      if (phoneError && isValidMobile(next)) setPhoneError('');
+                    }}
+                    onBlur={() => {
+                      if (!isValidMobile(patientPhone)) setPhoneError(MOBILE_ERROR);
+                    }}
+                    className={`w-full text-sm pl-12 pr-4 py-2.5 rounded-xl border focus:outline-none focus:ring-2 ${
+                      phoneError
+                        ? 'border-red-400 focus:ring-red-200'
+                        : 'border-slate-200 focus:ring-brand-green'
+                    }`}
+                  />
+                </div>
+                {phoneError && (
+                  <p id="booking-phone-error" role="alert" className="mt-1.5 flex items-center gap-1 text-[11px] font-semibold text-red-600">
+                    <AlertCircle className="h-3 w-3 shrink-0" aria-hidden="true" />
+                    {phoneError}
+                  </p>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-2">
@@ -331,14 +478,35 @@ export default function BookingModal({
               onChange={(e) => setReason(e.target.value)}
               className="w-full text-sm px-4 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-green"
             />
+
+            <label className="flex items-start gap-2.5 rounded-xl border border-slate-200 bg-slate-50 p-3 text-[11px] font-medium leading-relaxed text-slate-600">
+              <input
+                type="checkbox"
+                checked={smsConsent}
+                onChange={(e) => setSmsConsent(e.target.checked)}
+                className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-brand-green focus:ring-brand-green"
+              />
+              <span>
+                Send my booking details to this number by SMS and WhatsApp. Only appointment
+                information is shared — never clinical details.
+              </span>
+            </label>
+
+            {submitError && (
+              <p role="alert" className="flex items-start gap-1.5 text-xs font-semibold text-red-600">
+                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                {submitError}
+              </p>
+            )}
           </div>
 
           {/* Submit CTA */}
           <button
             type="submit"
-            className="w-full py-3.5 rounded-2xl bg-brand-navy hover:bg-brand-navy-dark text-white font-bold text-sm shadow-md transition hover:shadow-glow-navy flex items-center justify-center gap-2"
+            disabled={sending}
+            className="w-full py-3.5 rounded-2xl bg-brand-navy hover:bg-brand-navy-dark text-white font-bold text-sm shadow-md transition hover:shadow-glow-navy flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-70"
           >
-            <span>Confirm Appointment</span>
+            <span>{sending ? 'Confirming appointment…' : 'Confirm Appointment'}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
 

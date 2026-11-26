@@ -21,7 +21,7 @@ import {
   Upload,
   User,
 } from 'lucide-react';
-import { submitApplication } from '../lib/doctorRegistry';
+import { HELLO_EMAIL, dispatchWelcomeEmail, submitApplication } from '../lib/doctorRegistry';
 import { saveDocument } from '../lib/documentStore';
 
 const SPECIALTIES = [
@@ -36,7 +36,6 @@ const SPECIALTIES = [
 const initialForm = {
   fullName: '',
   email: '',
-  phone: '',
   city: '',
   languages: '',
   specialty: '',
@@ -72,6 +71,8 @@ export default function DoctorRegisterPage() {
   const [form, setForm] = useState(initialForm);
   const [errors, setErrors] = useState({});
   const [submitted, setSubmitted] = useState(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [mailDelivery, setMailDelivery] = useState(null);
   const [certificateFile, setCertificateFile] = useState(null);
   const [cvFile, setCvFile] = useState(null);
 
@@ -123,9 +124,19 @@ export default function DoctorRegisterPage() {
       document.getElementById('clinician-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       return;
     }
-    const application = submitApplication(form);
+    setSubmitting(true);
+    const application = submitApplication(form, { deferDispatch: true });
     await saveDocument(`${application.id}:certificate`, certificateFile);
     if (cvFile) await saveDocument(`${application.id}:cv`, cvFile);
+    const emailStatus = await dispatchWelcomeEmail({
+      to: application.email,
+      name: application.fullName,
+      role: 'doctor',
+      applicationId: application.id,
+      mailId: application.welcomeMailId,
+    });
+    setSubmitting(false);
+    setMailDelivery(emailStatus);
     setSubmitted(application);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -137,10 +148,20 @@ export default function DoctorRegisterPage() {
           <span className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-emerald-50 text-[#128D28]">
             <CheckCircle2 className="h-8 w-8" />
           </span>
-          <h1 className="mt-5 text-2xl font-extrabold text-[#0B3B82]">Application submitted</h1>
+          <h1 className="mt-5 text-2xl font-extrabold text-[#0B3B82]">Welcome to Nayacura — Application Submitted</h1>
           <p className="mt-2 text-sm leading-relaxed text-[#526987]">
-            Thank you, {submitted.fullName}. Our clinical governance team will verify your council registration and documents.
+            Thank you, {submitted.fullName}.{' '}
+            {mailDelivery?.sent
+              ? <>A welcome confirmation email has been delivered from <strong className="text-[#0B3B82]">{HELLO_EMAIL}</strong> to <strong className="text-[#0B3B82]">{submitted.email}</strong>.</>
+              : <>Your welcome confirmation from <strong className="text-[#0B3B82]">{HELLO_EMAIL}</strong> is queued for <strong className="text-[#0B3B82]">{submitted.email}</strong>.</>}
           </p>
+          {mailDelivery?.previewUrl && (
+            <div className="mt-3">
+              <a href={mailDelivery.previewUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-[#128D28] hover:bg-emerald-100">
+                <Mail className="h-3.5 w-3.5" /> Open Test Email Preview
+              </a>
+            </div>
+          )}
           <dl className="mt-6 grid gap-3 rounded-2xl bg-[#F8FBFF] p-4 text-left text-sm">
             <div className="flex items-center justify-between gap-3"><dt className="text-[#526987]">Application ID</dt><dd className="font-bold text-[#0B3B82]">{submitted.id}</dd></div>
             <div className="flex items-center justify-between gap-3"><dt className="text-[#526987]">Professional email</dt><dd className="font-semibold text-[#14213D]">{submitted.email}</dd></div>
@@ -149,9 +170,10 @@ export default function DoctorRegisterPage() {
           <div className="mt-6 rounded-2xl border border-dashed border-[#DCE7F6] p-4 text-left text-xs leading-relaxed text-[#526987]">
             <p className="font-bold text-[#31466A]">What happens next?</p>
             <ol className="mt-2 list-decimal space-y-1 pl-4">
+              <li>A welcome email from <strong>{HELLO_EMAIL}</strong> confirms your application is in the review queue.</li>
               <li>An administrator reviews your credentials in the clinician approval queue.</li>
-              <li>On approval, a thank-you email and a credentials email (Doctor ID + temporary password) are sent to {submitted.email}.</li>
-              <li>Use those credentials on the doctor sign-in page to enter your clinician console.</li>
+              <li>On approval, your <strong>Login Email and Temporary Password</strong> are sent from <strong>{HELLO_EMAIL}</strong> to {submitted.email}.</li>
+              <li>Use that email and password on the doctor sign-in page to enter your clinician console.</li>
             </ol>
           </div>
           <div className="mt-6 flex flex-wrap justify-center gap-3">
@@ -196,13 +218,13 @@ export default function DoctorRegisterPage() {
                 <div className="space-y-6 p-5 sm:p-6 lg:max-h-[70vh] lg:min-h-[460px] lg:overflow-y-auto">
               <section className="border-t border-[#EEF3FA] pt-6 first:border-t-0 first:pt-0">
                 <h2 className="flex items-center gap-2 text-sm font-extrabold uppercase tracking-wider text-[#0B3B82]">
-                  <User className="h-4 w-4" /> 01. Professional profile & contact
+                  <User className="h-4 w-4" /> 01. Professional profile &amp; email
                 </h2>
                 <div className="mt-4 grid gap-4 sm:grid-cols-2">
                   <Field label="Full name" required icon={User} error={errors.fullName}>
                     <input value={form.fullName} onChange={update('fullName')} placeholder="e.g. Dr. Maya Sharma, MD" className="w-full bg-transparent text-sm text-[#14213D] outline-none placeholder:text-slate-400" />
                   </Field>
-                  <Field label="Professional email" required icon={Mail} error={errors.email} hint="Approval and credentials are sent to this address.">
+                  <Field label="Professional email" required icon={Mail} error={errors.email} hint={`Welcome & login credentials are sent from ${HELLO_EMAIL} (no phone number needed).`}>
                     <input type="email" value={form.email} onChange={update('email')} placeholder="doctor@hospital.org" className="w-full bg-transparent text-sm text-[#14213D] outline-none placeholder:text-slate-400" />
                   </Field>
                   <Field label="City of practice" required icon={MapPin} error={errors.city}>
@@ -210,9 +232,6 @@ export default function DoctorRegisterPage() {
                   </Field>
                   <Field label="Consultation languages" required icon={Languages} error={errors.languages}>
                     <input value={form.languages} onChange={update('languages')} placeholder="e.g. English, Tamil, Hindi" className="w-full bg-transparent text-sm text-[#14213D] outline-none placeholder:text-slate-400" />
-                  </Field>
-                  <Field label="Contact number" icon={User}>
-                    <input value={form.phone} onChange={update('phone')} placeholder="+91 98xxx xxxxx" className="w-full bg-transparent text-sm text-[#14213D] outline-none placeholder:text-slate-400" />
                   </Field>
                 </div>
               </section>
@@ -304,8 +323,8 @@ export default function DoctorRegisterPage() {
                   <button type="button" onClick={() => navigate('/doctor-login')} className="inline-flex items-center justify-center gap-2 rounded-xl border border-[#DCE7F6] bg-white px-5 py-2.5 text-sm font-bold text-[#31466A] hover:bg-[#F0F6FF]">
                     <ArrowLeft className="h-4 w-4" /> Back to sign in
                   </button>
-                  <button type="submit" className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0B3B82] px-6 py-3 text-sm font-bold text-white shadow-sm hover:bg-[#082B5E]">
-                    <ShieldCheck className="h-4 w-4" /> Submit clinician application
+                  <button type="submit" disabled={submitting} className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#0B3B82] px-6 py-3 text-sm font-bold text-white shadow-sm hover:bg-[#082B5E] disabled:opacity-60">
+                    <ShieldCheck className="h-4 w-4" /> {submitting ? 'Submitting & sending welcome email...' : 'Submit clinician application'}
                   </button>
                 </div>
               </div>

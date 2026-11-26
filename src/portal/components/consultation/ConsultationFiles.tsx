@@ -142,7 +142,7 @@ export function ConsultationFiles({ appointmentId, isDoctor }: { appointmentId: 
                 {uploading ? 'Uploading…' : prescription ? 'Upload prescription PDF' : 'Upload report'}
                 <input type="file" disabled={uploading} accept={prescription ? 'application/pdf' : 'application/pdf,image/jpeg,image/png'}
                   onChange={(event) => void upload(event)} className="mt-2 block w-full text-xs text-mauve" />
-                <span className="mt-1 block text-mauve">{prescription ? 'PDF' : 'PDF, JPEG or PNG'} · Up to 5 MB. Demo files only.</span>
+                <span className="mt-1 block text-mauve">{prescription ? 'PDF' : 'PDF, JPEG or PNG'} · Up to 5 MB.</span>
               </label>
             )}
           </div>
