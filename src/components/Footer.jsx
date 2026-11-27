@@ -19,12 +19,12 @@ export default function Footer({ onOpenDoctorOnboarding }) {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Main Directory Links */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-8 pb-12 border-b border-slate-800 text-xs">
+        <div className="grid grid-cols-1 gap-x-8 gap-y-9 pb-10 border-b border-slate-800 text-xs sm:grid-cols-2 sm:gap-y-10 lg:grid-cols-5 lg:pb-12">
           
           {/* Col 1: Nayacura */}
           <div>
-            <h4 className="font-bold text-white uppercase tracking-wider mb-4">Nayacura</h4>
-            <ul className="space-y-2.5">
+            <h4 className="font-bold text-white uppercase tracking-wider mb-2 sm:mb-4">Nayacura</h4>
+            <ul className="grid grid-cols-2 gap-x-5 sm:block sm:space-y-2.5">
               <li><Link to="/about" className="hover:text-emerald-400 transition">About Our Mission</Link></li>
               <li><Link to="/about" className="hover:text-emerald-400 transition">Careers <span className="text-[10px] bg-emerald-500/20 text-emerald-400 px-1.5 py-0.5 rounded font-bold">Hiring</span></Link></li>
               <li><Link to="/about" className="hover:text-emerald-400 transition">Press & Research</Link></li>
@@ -42,8 +42,8 @@ export default function Footer({ onOpenDoctorOnboarding }) {
 
           {/* Col 2: Sexual Wellness */}
           <div>
-            <h4 className="font-bold text-white uppercase tracking-wider mb-4">Sexual Wellness</h4>
-            <ul className="space-y-2.5">
+            <h4 className="font-bold text-white uppercase tracking-wider mb-2 sm:mb-4">Sexual Wellness</h4>
+            <ul className="grid grid-cols-2 gap-x-5 sm:block sm:space-y-2.5">
               <li><Link to="/condition/erectile-dysfunction" className="hover:text-emerald-400 transition">Erectile Dysfunction Care</Link></li>
               <li><Link to="/condition/premature-ejaculation" className="hover:text-emerald-400 transition">Premature Ejaculation Care</Link></li>
               <li><Link to="/video-consult" className="hover:text-emerald-400 transition">Instant Video/Audio Consult</Link></li>
@@ -56,8 +56,8 @@ export default function Footer({ onOpenDoctorOnboarding }) {
 
           {/* Col 3: Women's Intimacy */}
           <div>
-            <h4 className="font-bold text-white uppercase tracking-wider mb-4">Women's Intimacy</h4>
-            <ul className="space-y-2.5">
+            <h4 className="font-bold text-white uppercase tracking-wider mb-2 sm:mb-4">Women's Intimacy</h4>
+            <ul className="grid grid-cols-2 gap-x-5 sm:block sm:space-y-2.5">
               <li><Link to="/condition/vaginismus" className="hover:text-emerald-400 transition">Vaginismus Rehabilitation</Link></li>
               <li><Link to="/condition/low-libido" className="hover:text-emerald-400 transition">Low Libido & Desire</Link></li>
               <li><Link to="/condition/dyspareunia" className="hover:text-emerald-400 transition">Dyspareunia (Painful Sex)</Link></li>
@@ -68,8 +68,8 @@ export default function Footer({ onOpenDoctorOnboarding }) {
 
           {/* Col 4: For Sexologists */}
           <div>
-            <h4 className="font-bold text-white uppercase tracking-wider mb-4">For Sexologists</h4>
-            <ul className="space-y-2.5">
+            <h4 className="font-bold text-white uppercase tracking-wider mb-2 sm:mb-4">For Sexologists</h4>
+            <ul className="grid grid-cols-2 gap-x-5 sm:block sm:space-y-2.5">
               <li><Link to="/for-sexologists" className="text-emerald-400 hover:text-emerald-300 transition font-bold">Join Sexologist Network</Link></li>
               <li><Link to="/for-sexologists" className="hover:text-emerald-400 transition">Encrypted EMR System</Link></li>
               <li><Link to="/for-sexologists" className="hover:text-emerald-400 transition">Private Teleconsult Suite</Link></li>
@@ -79,9 +79,9 @@ export default function Footer({ onOpenDoctorOnboarding }) {
           </div>
 
           {/* Col 5: Privacy Standards */}
-          <div>
-            <h4 className="font-bold text-white uppercase tracking-wider mb-4">Privacy Standards</h4>
-            <ul className="space-y-2.5">
+          <div className="sm:col-span-2 lg:col-span-1">
+            <h4 className="font-bold text-white uppercase tracking-wider mb-2 sm:mb-4">Privacy Standards</h4>
+            <ul className="grid grid-cols-2 gap-x-5 sm:block sm:space-y-2.5">
               <li>
                 <Link to="/privacy-standards" className="flex items-center gap-1.5 text-emerald-400 hover:text-emerald-300 font-semibold transition">
                   <Package className="w-3.5 h-3.5" /> 100% Plain Box Delivery

@@ -1,8 +1,10 @@
 import React from 'react';
-import { BookOpen, Clock, ArrowRight, Sparkles, UserCheck } from 'lucide-react';
-import { HEALTH_ARTICLES } from '../data/healthcareData';
+import { Link } from 'react-router-dom';
+import { BookOpen, Clock, Sparkles, UserCheck } from 'lucide-react';
+import { getDailyArticles } from '../data/articles';
 
 export default function HealthFeedSection() {
+  const articles = getDailyArticles(10);
   return (
     <section className="py-14 bg-slate-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -36,7 +38,7 @@ export default function HealthFeedSection() {
               </div>
               <div className="flex items-center gap-2 text-xs font-bold text-slate-700 bg-white px-4 py-2.5 rounded-2xl border border-emerald-200 shadow-sm">
                 <Clock className="w-4 h-4 text-[#16A34A]" />
-                <span>Updated Weekly</span>
+                <span>Fresh selection daily</span>
               </div>
             </div>
           </div>
@@ -44,10 +46,12 @@ export default function HealthFeedSection() {
 
         {/* Articles Grid */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {HEALTH_ARTICLES.map((art) => (
-            <div 
-              key={art.id}
-              className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-card-soft hover:shadow-xl hover:border-emerald-200 transition-all duration-300 flex flex-col justify-between group cursor-pointer"
+          {articles.map((art) => (
+            <Link
+              key={art.slug}
+              to={`/health-feed/${art.slug}`}
+              aria-label={`Read: ${art.title}`}
+              className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-card-soft hover:shadow-xl hover:border-emerald-200 transition-all duration-300 flex flex-col justify-between group cursor-pointer focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-navy"
             >
               <div>
                 <div className="relative h-48 overflow-hidden">
@@ -80,7 +84,7 @@ export default function HealthFeedSection() {
               <div className="p-6 pt-0 border-t border-slate-100 flex items-center justify-between mt-4">
                 <div className="flex items-center gap-2">
                   <div className="w-7 h-7 rounded-full bg-emerald-50 text-brand-green flex items-center justify-center text-xs font-bold">
-                    {art.author.charAt(3)}
+                    {art.author.replace(/^Dr\.?\s*/i, '').charAt(0)}
                   </div>
                   <div>
                     <div className="text-xs font-bold text-slate-800">{art.author}</div>
@@ -92,7 +96,7 @@ export default function HealthFeedSection() {
                   Read →
                 </span>
               </div>
-            </div>
+            </Link>
           ))}
         </div>
 

@@ -13,6 +13,7 @@ import ProceduresPage from './pages/ProceduresPage';
 import WellnessStorePage from './pages/WellnessStorePage';
 import ConditionDetailPage from './pages/ConditionDetailPage';
 import HealthFeedPage from './pages/HealthFeedPage';
+import ArticlePage from './pages/ArticlePage';
 import AskDoctorPage from './pages/AskDoctorPage';
 import PrivacyStandardsPage from './pages/PrivacyStandardsPage';
 import ForSexologistsPage from './pages/ForSexologistsPage';
@@ -248,6 +249,10 @@ function WebsiteApp() {
           />
 
           <Route path="/health-feed" element={<HealthFeedPage />} />
+          <Route
+            path="/health-feed/:slug"
+            element={<ArticlePage onBookAppointment={() => setIsScheduleModalOpen(true)} />}
+          />
           <Route path="/ask-doctor" element={<AskDoctorPage user={user} />} />
           <Route path="/privacy-standards" element={<PrivacyStandardsPage />} />
           <Route path="/for-sexologists" element={<ForSexologistsPage onOpenDoctorOnboarding={() => setIsDoctorOnboardingOpen(true)} />} />
