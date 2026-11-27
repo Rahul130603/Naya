@@ -260,20 +260,6 @@ export default function PatientLoginPage({ onLoginSuccess, currentUser, onLogout
     }, 700);
   };
 
-  // 1-Click Quick Demo Login (Fast, Frictionless)
-  const handleQuickDemoLogin = () => {
-    setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      const demoUser = currentConfig.demoUser;
-      if (onLoginSuccess) onLoginSuccess(demoUser);
-      setLoginSuccessMessage(`Signed in as ${demoUser.name} (${selectedRole.toUpperCase()})`);
-      setTimeout(() => {
-        navigate(currentConfig.redirectPath);
-      }, 800);
-    }, 400);
-  };
-
   return (
     <div className="min-h-[calc(100vh-80px)] bg-slate-50 py-10 sm:py-14 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
       {/* Ambient Brand Glow Effects */}
@@ -416,29 +402,6 @@ export default function PatientLoginPage({ onLoginSuccess, currentUser, onLogout
                     )}
                   </div>
                 )}
-
-                {/* Quick role-based sign in */}
-                <div className="mt-6 p-4 rounded-2xl bg-slate-50 border border-slate-200/80 hover:border-emerald-300 transition-colors">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div>
-                      <span className="inline-flex items-center gap-1.5 text-xs font-bold text-[#0B3B82]">
-                        <Sparkles className="h-3.5 w-3.5 text-emerald-600" /> Quick access
-                      </span>
-                      <p className="text-xs text-slate-500 mt-0.5">
-                        Continue as <strong>{currentConfig.demoName}</strong> ({selectedRole}).
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={handleQuickDemoLogin}
-                      disabled={isLoading}
-                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#0B3B82] to-[#114ba3] hover:from-[#082b5e] hover:to-[#0B3B82] px-4 py-2.5 text-xs font-bold text-white shadow-xs transition shrink-0 active:scale-95"
-                    >
-                      <UserCheck className="h-4 w-4 text-emerald-400" />
-                      <span>{currentConfig.demoTitle}</span>
-                    </button>
-                  </div>
-                </div>
 
                 {/* Email-Only Mode Tabs for Patient (Sign In vs Create Account) */}
                 {selectedRole === 'patient' ? (

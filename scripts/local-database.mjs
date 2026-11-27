@@ -37,7 +37,7 @@ if (contents && !existsSync(resolve(local, 'backend-env.original'))) {
 }
 const defaults = {
   DATABASE_URL: `postgresql://${config.user}:${config.password}@127.0.0.1:${config.port}/${config.database}?schema=public`,
-  PORT: '5000', APP_URL: 'http://localhost:4455', CORS_ORIGIN: 'http://localhost:4455',
+  PORT: '5000', APP_URL: 'http://localhost:5173', CORS_ORIGIN: 'http://localhost:5173',
   DEMO_MODE: 'false', COOKIE_SECURE: 'false',
 };
 if (!/^DATA_ENCRYPTION_KEY=.+$/m.test(contents)) defaults.DATA_ENCRYPTION_KEY = randomBytes(48).toString('base64url');
