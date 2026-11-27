@@ -75,74 +75,17 @@ function WebsiteApp() {
     }
   };
 
-  // Appointments state with intimate wellness demo appointment
-  const [appointments, setAppointments] = useState([
-    {
-      id: 'NC-2026-928104',
-      doctorName: 'Dr. Arvind Swaminathan',
-      doctorSpecialty: 'Clinical Sexologist',
-      clinicName: 'Nayacura Men & Women Intimate Health Clinic',
-      clinicAddress: '34, Sterling Road, Nungambakkam, Chennai',
-      day: 'Today',
-      date: TODAY_ISO_DATE,
-      timeSlot: '04:30 PM',
-      patientName: 'Karthik S.',
-      fee: 800,
-      type: 'clinic',
-      status: 'Confirmed (100% Private Room)'
-    }
-  ]);
+  // Appointments state — starts empty for every new account.
+  const [appointments, setAppointments] = useState([]);
 
   // Wellness Store Orders State
+  // Store orders start empty and persist per account.
   const [storeOrders, setStoreOrders] = useState(() => {
     try {
       const saved = localStorage.getItem('nayacura_store_orders');
       if (saved) return JSON.parse(saved);
     } catch {}
-    return [
-      {
-        id: 'NC-STORE-849201',
-        name: 'Karthik S.',
-        phone: '9840123456',
-        address: '14, Greenways Road, R.A. Puram, Chennai, Tamil Nadu',
-        city: 'Chennai',
-        postcode: '600028',
-        status: 'In Transit',
-        trackingNumber: 'BLUEDART-NY-98214X',
-        carrier: 'Blue Dart Express (Plain Box)',
-        estimatedDelivery: 'Tomorrow by 2:00 PM',
-        createdAt: new Date(Date.now() - 1000 * 60 * 60 * 18).toISOString(),
-        count: 2,
-        subtotal: 1298,
-        delivery: 0,
-        total: 1298,
-        savings: 1100,
-        lines: [
-          {
-            product: {
-              id: 'treat-3',
-              title: 'Pure Himalayan Shilajit Resin (Gold Grade)',
-              price: 799,
-              originalPrice: 1499,
-              size: '20g Pure Resin with Brass Spoon',
-              image: 'https://images.unsplash.com/photo-1615485290382-441e4d049cb5?auto=format&fit=crop&q=80&w=400'
-            },
-            quantity: 1
-          },
-          {
-            product: {
-              id: 'treat-2',
-              title: 'Nayacura Pro-Delay Care Spray',
-              price: 499,
-              originalPrice: 899,
-              size: 'Metered Dose Spray • 100+ Sprays',
-              image: 'https://images.unsplash.com/photo-1556228720-195a672e8a03?auto=format&fit=crop&q=80&w=400'
-            },
-            quantity: 1
-          }
-        ]
-      }
-    ];
+    return [];
   });
 
   const [isTrackingModalOpen, setIsTrackingModalOpen] = useState(false);

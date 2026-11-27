@@ -103,17 +103,17 @@ export default function PatientDashboardPage({
   // Live video room state
   const [callAppointment, setCallAppointment] = useState(null);
 
-  // Default demo patient profile if not logged in
+  // Fallback profile for a signed-out visitor — no seeded demo identity.
   const patientProfile = user || {
-    name: 'Suresh Kumar',
-    phone: '+91 98401 23456',
-    email: 'suresh.kumar@nayacura.patient',
-    id: 'NC-PAT-4921',
-    city: 'Chennai',
-    joinedDate: 'November 2026',
+    name: 'Patient',
+    phone: '',
+    email: '',
+    id: '',
+    city: '',
+    joinedDate: '',
   };
 
-  const displayName = useAnonymousAlias ? 'Private Patient #4921' : patientProfile.name;
+  const displayName = useAnonymousAlias ? 'Private Patient' : patientProfile.name;
   const firstName = displayName.split(' ')[0] || 'Patient';
   const avatarLetter = firstName.charAt(0).toUpperCase();
 
@@ -134,131 +134,15 @@ export default function PatientDashboardPage({
     { key: 'privacy', label: 'Privacy & Security', icon: ShieldCheck },
   ];
 
-  // Mock Certified Digital Prescriptions
-  const [prescriptions] = useState([
-    {
-      id: 'RX-2026-8812',
-      doctor: 'Dr. Arvind Swaminathan',
-      specialty: 'Clinical Sexologist (Reg: TN-MED-44819)',
-      date: '21 Nov 2026',
-      validTill: '21 May 2027',
-      diagnosis: 'Erectile Vitality & Performance Anxiety Management',
-      medicines: [
-        {
-          name: 'Tadalafil Daily Care 5mg',
-          dosage: '1 tablet daily at bedtime with water',
-          duration: '30 Days',
-          instructions: 'Non-habit forming PDE-5 regulator. Do not consume with heavy alcohol.',
-          refillAvailable: true,
-          storeProductId: 'ed-treatment',
-          price: 799,
-        },
-        {
-          name: 'Pure Himalayan Shilajit Resin (Gold Grade)',
-          dosage: 'Pea-sized scoop (approx. 250mg) in warm milk every morning',
-          duration: '60 Days',
-          instructions: 'Ayurvedic vitality booster rich in 84+ minerals & 75% fulvic acid.',
-          refillAvailable: true,
-          storeProductId: 'shilajit',
-          price: 799,
-        },
-      ],
-      clinicalNotes: 'Patient advised to combine daily aerobic exercise with stress management. Follow up teleconsult scheduled in 4 weeks.',
-    },
-    {
-      id: 'RX-2026-7920',
-      doctor: 'Dr. Priya Ramachandran',
-      specialty: 'Intimate Wellness & Pelvic Floor Specialist (Reg: TN-MED-59201)',
-      date: '14 Nov 2026',
-      validTill: '14 Feb 2027',
-      diagnosis: 'Calibrated Intimate Sensitivity Regulation',
-      medicines: [
-        {
-          name: 'Nayacura Pro-Delay Care Spray',
-          dosage: '1 to 2 metered sprays topically 15 minutes prior to intimacy',
-          duration: '100+ Sprays Bottle',
-          instructions: 'Wipe clean before intercourse. Clinical desensitizing without partner numbness.',
-          refillAvailable: true,
-          storeProductId: 'delay-spray',
-          price: 499,
-        },
-      ],
-      clinicalNotes: 'Pelvic floor relaxation drills recommended 3x weekly. Safe to continue as required.',
-    },
-  ]);
+  // Prescriptions appear only after a clinician issues one for this account.
+  const [prescriptions] = useState([]);
 
-  // Mock Confidential Lab Diagnostic Reports
-  const [labReports] = useState([
-    {
-      id: 'LAB-2026-9041',
-      title: '7-Panel Confidential Comprehensive STI Screen',
-      sampleDate: '19 Nov 2026',
-      verifiedDate: '20 Nov 2026',
-      status: 'Normal / Verified',
-      labPartner: 'Nayacura NABL-Accredited Central Diagnostic Lab, Chennai',
-      pathologist: 'Dr. Meenakshi Sundaram, MD (Pathology)',
-      parameters: [
-        { test: 'HIV 1 & 2 Antibody & p24 Antigen (4th Gen)', result: 'Non-Reactive', reference: 'Non-Reactive', status: 'Normal' },
-        { test: 'Hepatitis B Surface Antigen (HBsAg)', result: 'Non-Reactive', reference: 'Non-Reactive', status: 'Normal' },
-        { test: 'Syphilis Antibody (VDRL / RPR Titer)', result: 'Non-Reactive', reference: 'Non-Reactive', status: 'Normal' },
-        { test: 'HSV 1 & 2 IgG Antibodies', result: 'Negative', reference: 'Negative', status: 'Normal' },
-        { test: 'Chlamydia Trachomatis NAAT', result: 'Negative', reference: 'Negative', status: 'Normal' },
-        { test: 'Neisseria Gonorrhoeae NAAT', result: 'Negative', reference: 'Negative', status: 'Normal' },
-        { test: 'Trichomonas Vaginalis DNA', result: 'Negative', reference: 'Negative', status: 'Normal' },
-      ],
-      summary: 'All 7 screened intimate pathogens tested Non-Reactive / Negative. No active or past transmission markers detected.',
-    },
-    {
-      id: 'LAB-2026-8192',
-      title: 'Male Hormone & Vitality Biomarker Panel',
-      sampleDate: '10 Nov 2026',
-      verifiedDate: '11 Nov 2026',
-      status: 'Normal / Verified',
-      labPartner: 'Nayacura NABL-Accredited Central Diagnostic Lab, Chennai',
-      pathologist: 'Dr. Meenakshi Sundaram, MD (Pathology)',
-      parameters: [
-        { test: 'Total Testosterone (Serum)', result: '624 ng/dL', reference: '280 - 850 ng/dL', status: 'Optimal' },
-        { test: 'Free Testosterone (Direct ECLIA)', result: '17.8 pg/mL', reference: '8.7 - 25.1 pg/mL', status: 'Optimal' },
-        { test: 'Prolactin (Serum)', result: '9.2 ng/mL', reference: '4.0 - 15.2 ng/mL', status: 'Normal' },
-        { test: 'Sex Hormone Binding Globulin (SHBG)', result: '34.6 nmol/L', reference: '18.3 - 54.1 nmol/L', status: 'Normal' },
-        { test: 'DHEA-Sulfate', result: '240 µg/dL', reference: '160 - 449 µg/dL', status: 'Normal' },
-      ],
-      summary: 'Androgen profile is within healthy clinical ranges. Free and total testosterone bio-availability is robust.',
-    },
-  ]);
+  // Lab reports appear once a booked test has been processed for this account.
+  const [labReports] = useState([]);
 
-  // Demo bookings are only used when no booking exists in state yet.
-  const demoAppointments = [
-    {
-      id: 'NC-2026-928104',
-      doctorName: 'Dr. Arvind Swaminathan',
-      doctorSpecialty: 'Clinical Sexologist',
-      clinicName: 'Nayacura Men & Women Intimate Health Clinic',
-      clinicAddress: '34, Sterling Road, Nungambakkam, Chennai',
-      day: 'Today',
-      date: TODAY.toISOString(),
-      timeSlot: '04:30 PM',
-      patientName: displayName,
-      fee: 800,
-      type: 'clinic',
-      status: 'Confirmed',
-    },
-    {
-      id: 'NC-2026-941029',
-      doctorName: 'Dr. Priya Ramachandran',
-      doctorSpecialty: 'Intimate Wellness & Pelvic Floor Specialist',
-      clinicName: 'Nayacura Encrypted Telehealth Suite',
-      day: 'Tomorrow',
-      date: TOMORROW.toISOString(),
-      timeSlot: '11:00 AM',
-      patientName: displayName,
-      fee: 950,
-      type: 'video',
-      status: 'Confirmed',
-    },
-  ];
+  // Bookings always come from this account's own state.
 
-  const allBookings = appointments.length > 0 ? appointments : demoAppointments;
+  const allBookings = appointments;
   // Lab pickups are pushed into the same appointments array, so keep them apart.
   const consultations = allBookings
     .filter((booking) => booking.doctorName)
@@ -277,7 +161,7 @@ export default function PatientDashboardPage({
   const nextConsultation = consultations.find((booking) => booking.dateObj && booking.dateObj >= TODAY)
     || consultations[0]
     || null;
-  const primaryRoomCode = roomCodeFor(nextConsultation?.doctorName || 'Dr. Arvind Swaminathan');
+  const primaryRoomCode = roomCodeFor(nextConsultation?.doctorName || 'Nayacura Consultation');
   const { room: primaryRoom, doctorPresent: primaryDoctorPresent } = useVideoRoom(primaryRoomCode);
   const isPrimaryRoomCompleted = primaryRoom?.status === 'completed';
   const appointmentStatus = (appointment) => (
@@ -554,7 +438,9 @@ export default function PatientDashboardPage({
 
               <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
                 <section id="consultation-card" className="rounded-2xl border border-[#DCE7F6] bg-white p-5 shadow-sm">
-                  <div className="flex items-center justify-between gap-3 border-b border-[#E1E7EF] pb-3"><h3 className="flex items-center gap-2 text-base font-extrabold text-[#0B3B82]"><Calendar className="h-5 w-5" />{nextConsultation && appointmentStatus(nextConsultation) === 'Completed' ? 'Last Consultation' : 'Upcoming Consultation'}</h3><span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-[#128D28]">{nextConsultation ? appointmentStatus(nextConsultation) : 'Scheduled'}</span></div>
+                  <div className="flex items-center justify-between gap-3 border-b border-[#E1E7EF] pb-3"><h3 className="flex items-center gap-2 text-base font-extrabold text-[#0B3B82]"><Calendar className="h-5 w-5" />{nextConsultation && appointmentStatus(nextConsultation) === 'Completed' ? 'Last Consultation' : 'Upcoming Consultation'}</h3>{nextConsultation && (
+                  <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-[#128D28]">{appointmentStatus(nextConsultation)}</span>
+                )}</div>
                   {nextConsultation ? <>
                     <div className="flex flex-wrap items-center justify-between gap-4 py-4">
                       <div className="flex items-center gap-3"><span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-blue-50 font-extrabold text-[#0B3B82]">{nextConsultation.doctorName?.charAt(0) || 'D'}</span><div><p className="font-bold text-[#14213D]">{nextConsultation.doctorName}</p><p className="text-xs text-[#526987]">{nextConsultation.doctorSpecialty}</p><p className="mt-1 text-xs text-[#0B3B82]">{nextConsultation.clinicName}</p></div></div>
@@ -764,6 +650,13 @@ export default function PatientDashboardPage({
                 action={<button type="button" onClick={() => navigate('/wellness-store')} className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-[#16A34A] bg-emerald-50 px-5 py-2 text-sm font-bold text-[#128D28] hover:bg-emerald-100"><Pill className="h-4 w-4" />Order medicines</button>}
               />
               <div className="grid gap-4 xl:grid-cols-2">
+                {prescriptions.length === 0 && (
+                  <div className="rounded-2xl border border-[#DCE7F6] bg-white p-8 text-center shadow-sm xl:col-span-2">
+                    <FileText className="mx-auto h-8 w-8 text-[#94A3B8]" />
+                    <p className="mt-3 text-base font-bold text-[#0B3B82]">No prescriptions yet</p>
+                    <p className="mt-1 text-sm text-[#526987]">Prescriptions issued after a consultation will appear here.</p>
+                  </div>
+                )}
                 {prescriptions.map((rx) => (
                   <article key={rx.id} className="rounded-2xl border border-[#DCE7F6] bg-white p-5 shadow-sm">
                     <div className="flex items-start justify-between gap-3">
@@ -796,6 +689,13 @@ export default function PatientDashboardPage({
                 action={<Link to="/lab-tests" className="inline-flex min-h-11 items-center gap-2 rounded-xl bg-[#0B3B82] px-5 py-2 text-sm font-bold text-white hover:bg-[#082B5E]"><FlaskConical className="h-4 w-4" />Book a test</Link>}
               />
               <div className="grid gap-3">
+                {labReports.length === 0 && (
+                  <div className="rounded-2xl border border-[#DCE7F6] bg-white p-8 text-center shadow-sm">
+                    <FlaskConical className="mx-auto h-8 w-8 text-[#94A3B8]" />
+                    <p className="mt-3 text-base font-bold text-[#0B3B82]">No lab reports yet</p>
+                    <p className="mt-1 text-sm text-[#526987]">Book a confidential test and your verified reports will appear here.</p>
+                  </div>
+                )}
                 {labReports.map((report) => (
                   <article key={report.id} className="flex flex-col gap-3 rounded-2xl border border-[#DCE7F6] bg-white p-5 shadow-sm sm:flex-row sm:items-center sm:justify-between">
                     <div>
