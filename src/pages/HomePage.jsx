@@ -50,7 +50,7 @@ export default function HomePage({
       <HeroSection
         selectedCity={selectedCity}
         onSelectSpecialty={(spec) => navigate(`/consult-sexologist?specialty=${encodeURIComponent(spec)}`)}
-        onSelectDoctor={(doc) => onBookAppointment(doc, 'clinic')}
+        onSelectDoctor={(doc) => onBookAppointment(doc, 'video')}
         onNavigateToTab={(tab) => {
           if (tab === 'booking') onOpenBookingSchedule();
           if (tab === 'home') navigate('/consult-sexologist');
@@ -171,7 +171,26 @@ export default function HomePage({
               >
                 <div>
                   <div className="flex items-center gap-4 mb-4">
-                    <img src={doc.photo} alt={doc.name} className="w-16 h-16 rounded-2xl object-cover border-2 border-slate-100 shadow" />
+                    <img
+                      src={doc.photo}
+                      alt={doc.name}
+                      onError={(event) => {
+                        const img = event.currentTarget;
+                        if (img.dataset.fallback) return;
+                        img.dataset.fallback = 'true';
+                        const initials = doc.name
+                          .replace(/^Dr\.?\s*/i, '')
+                          .split(/\s+/)
+                          .map((part) => part[0] || '')
+                          .slice(0, 2)
+                          .join('')
+                          .toUpperCase();
+                        img.src = `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(
+                          `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160"><rect width="160" height="160" fill="#E8F5EC"/><text x="80" y="100" font-family="Inter, system-ui, sans-serif" font-size="58" font-weight="700" fill="#15803D" text-anchor="middle">${initials}</text></svg>`,
+                        )}`;
+                      }}
+                      className="w-16 h-16 rounded-2xl object-cover border-2 border-slate-100 shadow"
+                    />
                     <div>
                       <h4 className="font-bold text-brand-navy text-base">{doc.name}</h4>
                       <p className="text-xs text-brand-green font-bold">{doc.specialty}</p>
@@ -184,29 +203,23 @@ export default function HomePage({
                   </p>
 
                   <div className="text-xs text-slate-500 bg-slate-50 p-2.5 rounded-xl border border-slate-100">
-                    <span className="font-bold text-slate-700">{doc.clinicName}</span>
-                    <p className="truncate text-[11px]">{doc.clinicAddress}</p>
+                    <span className="font-bold text-slate-700">100% Online Consultation</span>
+                    <p className="truncate text-[11px]">Encrypted Video &amp; Audio Call · {doc.city}</p>
                   </div>
                 </div>
 
                 <div className="mt-5 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
                   <div>
-                    <span className="text-[10px] text-slate-400 block uppercase">Consultation Fee</span>
-                    <span className="text-base font-extrabold text-brand-navy">₹{doc.fee}</span>
+                    <span className="text-[10px] text-slate-400 block uppercase">Video / Audio Fee</span>
+                    <span className="text-base font-extrabold text-brand-navy">₹{doc.videoFee || doc.fee}</span>
                   </div>
 
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => onStartVideoConsult(doc)}
-                      className="px-3 py-1.5 rounded-xl bg-emerald-50 text-brand-green-dark border border-emerald-200 text-xs font-bold hover:bg-brand-green hover:text-white transition"
-                    >
-                      Call (₹{doc.videoFee})
-                    </button>
-                    <button
-                      onClick={() => onBookAppointment(doc, 'clinic')}
+                      onClick={() => onBookAppointment(doc, 'video')}
                       className="px-3.5 py-1.5 rounded-xl bg-brand-navy text-white text-xs font-bold hover:bg-brand-navy-dark transition"
                     >
-                      Book Visit
+                      Book Online
                     </button>
                   </div>
                 </div>

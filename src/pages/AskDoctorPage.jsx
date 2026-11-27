@@ -30,9 +30,8 @@ import {
 
 const RECOMMENDATIONS = [
   'General Self-Care Guidance',
-  'Video Consultation Recommended',
+  'Online Consultation Recommended',
   'At-Home Hormone / STI Test',
-  'In-Clinic Evaluation',
 ];
 
 function formatRelativeDate(iso) {

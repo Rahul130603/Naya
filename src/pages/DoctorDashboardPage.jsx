@@ -2,9 +2,34 @@ import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import VideoCallRoom from '../components/VideoCallRoom';
 import DoctorQaSection from '../components/DoctorQaSection';
+import PracticeScheduleEditor from '../components/PracticeScheduleEditor';
 import useVideoRoom from '../hooks/useVideoRoom';
 import { roomCodeFor } from '../lib/videoRoom';
 import { listQaThreads, subscribeQaThreads } from '../lib/communityQa';
+import {
+  formatDateLabel,
+  formatTime,
+  hasSavedSchedule,
+  hydrateSchedule,
+  loadSchedule,
+  slotsForDate,
+  subscribeSchedule,
+} from '../lib/practiceSchedule';
+import {
+  hydrateDoctorBookings,
+  listDoctorBookings,
+  subscribeBookings,
+  toDoctorQueueEntry,
+} from '../lib/bookingsStore';
+import {
+  changeDoctorPassword,
+  getDoctorProfileOverride,
+  hydrateDoctorProfile,
+  listAccounts,
+  saveDoctorProfileLocal,
+  subscribeRegistry,
+  syncDoctorProfileToServer,
+} from '../lib/doctorRegistry';
 import { 
   LayoutDashboard,
   Users,
@@ -18,16 +43,76 @@ import {
   X,
   ChevronRight,
   Plus,
+  Eye,
   EyeOff,
   Lock,
   ShieldCheck,
   CheckCircle2,
   Calendar,
-  MapPin,
-  ArrowRight,
   Building,
-  MessageCircleQuestion
+  MessageCircleQuestion,
+  Camera,
+  Trash2,
+  KeyRound,
+  Save,
+  AlertCircle
 } from 'lucide-react';
+
+const RX_STORAGE_PREFIX = 'nayacura_doctor_prescriptions_v1';
+
+const rxStorageKey = (doctorName) => {
+  const normalized = String(doctorName || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  return normalized ? `${RX_STORAGE_PREFIX}:${normalized}` : RX_STORAGE_PREFIX;
+};
+
+const loadDoctorPrescriptions = (doctorName) => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = window.localStorage.getItem(rxStorageKey(doctorName));
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveDoctorPrescriptions = (doctorName, items) => {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(rxStorageKey(doctorName), JSON.stringify(items));
+  } catch {
+    /* storage may be blocked */
+  }
+};
+
+function resizePhotoToDataUrl(file, maxSize = 320) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Could not read the selected image.'));
+    reader.onload = () => {
+      const dataUrl = String(reader.result || '');
+      const img = new Image();
+      img.onload = () => {
+        const scale = Math.min(1, maxSize / Math.max(img.width || 1, img.height || 1));
+        const width = Math.max(1, Math.round((img.width || maxSize) * scale));
+        const height = Math.max(1, Math.round((img.height || maxSize) * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(dataUrl);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', 0.86));
+      };
+      img.onerror = () => reject(new Error('Selected file is not a valid image.'));
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+  });
+}
 
 const SECTION_TITLES = {
   overview: 'Dashboard Overview',
@@ -40,7 +125,7 @@ const SECTION_TITLES = {
   profile: 'Clinician Profile & Credentials'
 };
 
-export default function DoctorDashboardPage({ user, onLogout }) {
+export default function DoctorDashboardPage({ user, onLogout, onUpdateUser }) {
   const navigate = useNavigate();
   const { section } = useParams();
   const [internalSection, setInternalSection] = useState(section || 'overview');
@@ -57,11 +142,12 @@ export default function DoctorDashboardPage({ user, onLogout }) {
 
   // Practice state
   const [isAcceptingInstantCalls, setIsAcceptingInstantCalls] = useState(true);
-  const [queueFilter, setQueueFilter] = useState('all'); // 'all' | 'clinic' | 'video'
-  const [selectedEmrPatient, setSelectedEmrPatient] = useState('PT-9410');
+  const [selectedEmrPatient, setSelectedEmrPatient] = useState('');
   const [qaThreads, setQaThreads] = useState(() => listQaThreads());
+  const [profileVersion, setProfileVersion] = useState(0);
 
   useEffect(() => subscribeQaThreads(setQaThreads), []);
+  useEffect(() => subscribeRegistry(() => setProfileVersion((v) => v + 1)), []);
 
   const pendingQaCount = qaThreads.filter((thread) => thread.answers.length === 0).length;
 
@@ -70,17 +156,264 @@ export default function DoctorDashboardPage({ user, onLogout }) {
     setTimeout(() => setPrescribedToast(null), 4000);
   };
 
-  // Clinician profile
-  const doctor = user?.role === 'doctor' ? user : {
-    name: 'Dr. Arvind Swaminathan',
-    regNo: 'TN-MED-44819',
-    specialty: 'Clinical Sexologist & Andrologist',
-    experience: '14+ Years',
-    clinic: 'Nayacura Men & Women Intimate Health Clinic, Chennai',
-    email: 'dr.arvind@nayacura.clinic',
-    phone: '+91 94440 18291',
-    role: 'doctor'
+  void profileVersion;
+  const savedProfileOverride = getDoctorProfileOverride(user?.email, user?.name);
+
+  // Clinician profile — uses signed-in doctor details + saved overrides, never seeded demo identity.
+  const baseDoctor = user?.role === 'doctor'
+    ? {
+        ...user,
+        name: user.name || 'Clinician',
+        regNo: user.regNo || '',
+        council: user.council || '',
+        specialty: user.specialty || 'Clinical Sexologist',
+        qualifications: user.qualifications || '',
+        languages: user.languages || '',
+        experience: user.experience
+          ? (/year/i.test(String(user.experience)) ? String(user.experience) : `${user.experience} Years`)
+          : '',
+        clinic: user.clinic || user.city || 'Nayacura Partner Clinic',
+        city: user.city || 'Chennai',
+        email: user.email || '',
+        phone: user.phone || '',
+        about: user.about || '',
+        videoFee: user.videoFee || 599,
+        photoUrl: user.photoUrl || '',
+        role: 'doctor',
+      }
+    : {
+        name: 'Clinician',
+        regNo: '',
+        council: '',
+        specialty: 'Clinical Specialist',
+        qualifications: '',
+        languages: '',
+        experience: '',
+        clinic: '',
+        city: 'Chennai',
+        email: '',
+        phone: '',
+        about: '',
+        videoFee: 599,
+        photoUrl: '',
+        role: 'doctor',
+      };
+
+  const doctor = savedProfileOverride
+    ? {
+        ...baseDoctor,
+        ...savedProfileOverride,
+        clinic: savedProfileOverride.clinic || savedProfileOverride.clinicName || baseDoctor.clinic,
+        experience: savedProfileOverride.experience
+          ? (/year/i.test(String(savedProfileOverride.experience))
+            ? String(savedProfileOverride.experience)
+            : `${savedProfileOverride.experience} Years`)
+          : baseDoctor.experience,
+        email: baseDoctor.email || savedProfileOverride.email || '',
+      }
+    : baseDoctor;
+
+  const avatarLetter = (doctor.name || 'D').replace(/^Dr\.?\s*/i, '').trim().charAt(0).toUpperCase() || 'D';
+
+  const buildProfileFormState = (doc) => ({
+    name: doc.name || '',
+    specialty: doc.specialty || 'Clinical Sexologist',
+    qualifications: doc.qualifications || '',
+    experience: doc.experience || '',
+    languages: Array.isArray(doc.languages) ? doc.languages.join(', ') : (doc.languages || ''),
+    clinic: doc.clinic || '',
+    city: doc.city || 'Chennai',
+    council: doc.council || '',
+    regNo: doc.regNo || '',
+    phone: doc.phone || '',
+    videoFee: doc.videoFee ? String(doc.videoFee) : '599',
+    about: doc.about || '',
+    photoUrl: doc.photoUrl || '',
+  });
+
+  const [profileForm, setProfileForm] = useState(() => buildProfileFormState(doctor));
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileError, setProfileError] = useState('');
+  const [profileSavedMsg, setProfileSavedMsg] = useState('');
+
+  const [currentPasswordInput, setCurrentPasswordInput] = useState('');
+  const [newPasswordInput, setNewPasswordInput] = useState('');
+  const [confirmPasswordInput, setConfirmPasswordInput] = useState('');
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [passwordSaving, setPasswordSaving] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState('');
+
+  useEffect(() => {
+    if (!doctor.email && !doctor.name) return;
+    let active = true;
+    hydrateDoctorProfile({ email: doctor.email, name: doctor.name }).then((remoteProfile) => {
+      if (!active || !remoteProfile) return;
+      setProfileForm((prev) => ({
+        ...prev,
+        ...buildProfileFormState({ ...doctor, ...remoteProfile }),
+      }));
+    });
+    return () => {
+      active = false;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.email, user?.name]);
+
+  const hasRegisteredPassword = Boolean(
+    doctor.email &&
+      listAccounts().some(
+        (acc) => acc.email?.toLowerCase() === doctor.email.toLowerCase() && acc.password,
+      ),
+  );
+
+  const persistDoctorProfile = async (nextValues, successToast) => {
+    const cleanName = String(nextValues.name || '').trim();
+    if (!cleanName) {
+      setProfileError('Doctor name is required.');
+      return false;
+    }
+    setProfileError('');
+    setProfileSavedMsg('');
+    setProfileSaving(true);
+
+    const payload = {
+      id: doctor.id,
+      email: doctor.email,
+      name: cleanName,
+      specialty: String(nextValues.specialty || '').trim() || 'Clinical Sexologist',
+      qualifications: String(nextValues.qualifications || '').trim(),
+      experience: String(nextValues.experience || '').trim(),
+      languages: String(nextValues.languages || '').trim(),
+      clinic: String(nextValues.clinic || '').trim() || 'Nayacura Partner Clinic',
+      clinicName: String(nextValues.clinic || '').trim() || 'Nayacura Partner Clinic',
+      city: String(nextValues.city || '').trim() || 'Chennai',
+      council: String(nextValues.council || '').trim(),
+      regNo: String(nextValues.regNo || '').trim(),
+      phone: String(nextValues.phone || '').trim(),
+      videoFee: Number(nextValues.videoFee) > 0 ? Number(nextValues.videoFee) : 599,
+      about: String(nextValues.about || '').trim(),
+      photoUrl: nextValues.photoUrl || '',
+    };
+
+    const saved = saveDoctorProfileLocal(payload);
+    await syncDoctorProfileToServer(payload);
+
+    if (onUpdateUser) {
+      onUpdateUser({
+        ...doctor,
+        ...saved,
+        role: 'doctor',
+      });
+    } else if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.setItem('nayacura_user', JSON.stringify({ ...doctor, ...saved, role: 'doctor' }));
+      } catch {
+        /* ignore */
+      }
+    }
+
+    setProfileSaving(false);
+    setProfileSavedMsg(successToast || 'Profile changes saved!');
+    showDoctorToast(successToast || 'Clinician profile updated!');
+    return true;
   };
+
+  const handleSaveProfile = async (e) => {
+    e.preventDefault();
+    await persistDoctorProfile(profileForm, 'Profile details saved!');
+  };
+
+  const handlePhotoFileChange = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) {
+      setProfileError('Please choose a valid image file (PNG, JPG, or WEBP).');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setProfileError('Image must be smaller than 5 MB.');
+      return;
+    }
+    try {
+      const compressed = await resizePhotoToDataUrl(file, 320);
+      const next = { ...profileForm, photoUrl: compressed };
+      setProfileForm(next);
+      await persistDoctorProfile(next, 'Profile photo updated!');
+    } catch (err) {
+      setProfileError(err?.message || 'Could not process the selected image.');
+    }
+  };
+
+  const handleRemovePhoto = async () => {
+    const next = { ...profileForm, photoUrl: '' };
+    setProfileForm(next);
+    await persistDoctorProfile(next, 'Profile photo removed.');
+  };
+
+  const handleUpdatePassword = async (e) => {
+    e.preventDefault();
+    setPasswordError('');
+    setPasswordSuccess('');
+
+    if (hasRegisteredPassword && !currentPasswordInput) {
+      setPasswordError('Please enter your current password.');
+      return;
+    }
+    if (!newPasswordInput || newPasswordInput.length < 6) {
+      setPasswordError('New password must be at least 6 characters.');
+      return;
+    }
+    if (newPasswordInput !== confirmPasswordInput) {
+      setPasswordError('New passwords do not match.');
+      return;
+    }
+
+    setPasswordSaving(true);
+    const result = await changeDoctorPassword({
+      id: doctor.id,
+      email: doctor.email,
+      name: doctor.name,
+      regNo: doctor.regNo,
+      council: doctor.council,
+      specialty: doctor.specialty,
+      city: doctor.city,
+      clinicName: doctor.clinic,
+      currentPassword: currentPasswordInput || undefined,
+      newPassword: newPasswordInput,
+    });
+    setPasswordSaving(false);
+
+    if (!result.ok) {
+      setPasswordError(result.message || 'Could not update password.');
+      return;
+    }
+
+    setCurrentPasswordInput('');
+    setNewPasswordInput('');
+    setConfirmPasswordInput('');
+    setPasswordSuccess(result.message);
+    showDoctorToast('Password updated successfully!');
+  };
+
+  const [practiceSchedule, setPracticeSchedule] = useState(() => loadSchedule(doctor.name));
+  const [schedulePublished, setSchedulePublished] = useState(() => hasSavedSchedule(doctor.name));
+
+  useEffect(() => {
+    setPracticeSchedule(loadSchedule(doctor.name));
+    setSchedulePublished(hasSavedSchedule(doctor.name));
+    void hydrateSchedule(doctor.name);
+    return subscribeSchedule((next) => {
+      if (!next) return;
+      if (!doctor.name || !next.doctorName || next.doctorName.trim().toLowerCase() === doctor.name.trim().toLowerCase()) {
+        setPracticeSchedule(next);
+        setSchedulePublished(Boolean(next.updatedAt));
+      }
+    });
+  }, [doctor.name]);
 
   const navItems = [
     { key: 'overview', label: 'Dashboard Overview', icon: LayoutDashboard },
@@ -90,6 +423,7 @@ export default function DoctorDashboardPage({ user, onLogout }) {
     { key: 'prescriptions', label: 'E-Prescriptions', icon: FileText },
     { key: 'emr', label: 'Patient Records (EMR)', icon: FlaskConical },
     { key: 'schedule', label: 'Practice Schedule', icon: Clock },
+    { key: 'profile', label: 'Profile & Security', icon: UserRound },
   ];
 
   const handleNavClick = (key) => {
@@ -98,68 +432,33 @@ export default function DoctorDashboardPage({ user, onLogout }) {
     setSidebarOpen(false);
   };
 
-  // Patients Queue
-  const [patientsQueue] = useState([
-    {
-      id: 'PT-9410',
-      name: 'Suresh Kumar',
-      age: 34,
-      gender: 'Male',
-      time: '04:30 PM (Today)',
-      type: 'clinic',
-      room: 'Private Consultation Suite 3',
-      chiefComplaint: 'Erectile Vitality & Performance Anxiety Management',
-      status: 'Confirmed & Checked-In',
-      history: 'Consultation #2. Biomarkers verified (Testosterone: 624 ng/dL, STI 7-Panel: Negative).',
-      vitals: { bp: '120/80 mmHg', pulse: '72 bpm', weight: '74 kg' }
-    },
-    {
-      id: 'PT-9418',
-      name: 'Anonymous Patient #812',
-      age: 29,
-      gender: 'Male',
-      time: '05:15 PM (Today)',
-      type: 'video',
-      room: 'Encrypted HD Video Room',
-      chiefComplaint: 'Premature Ejaculation & Sensitivity Calibration',
-      status: 'Ready in Waiting Room',
-      history: 'First time confidential video consult.',
-      vitals: { bp: '118/76 mmHg', pulse: '76 bpm', weight: '68 kg' }
-    },
-    {
-      id: 'PT-9422',
-      name: 'Karthik Raja',
-      age: 38,
-      gender: 'Male',
-      time: '06:00 PM (Today)',
-      type: 'clinic',
-      room: 'Private Consultation Suite 3',
-      chiefComplaint: 'Low Libido & Daily Fatigue Evaluation',
-      status: 'Confirmed',
-      history: 'Follow-up on Shilajit & hormonal regimen.',
-      vitals: { bp: '124/82 mmHg', pulse: '70 bpm', weight: '78 kg' }
-    },
-    {
-      id: 'PT-9430',
-      name: 'Anonymous Patient #930',
-      age: 31,
-      gender: 'Male',
-      time: '06:45 PM (Today)',
-      type: 'video',
-      room: 'Encrypted HD Video Room',
-      chiefComplaint: 'Post-Finasteride Sexual Wellness Evaluation',
-      status: 'Confirmed',
-      history: 'Review of endocrine blood profile.',
-      vitals: { bp: '122/80 mmHg', pulse: '74 bpm', weight: '71 kg' }
-    }
-  ]);
+  // Patients Queue — hydrated live from confirmed bookings for this clinician.
+  const [patientsQueue, setPatientsQueue] = useState(() =>
+    listDoctorBookings(doctor.name).map(toDoctorQueueEntry),
+  );
+
+  useEffect(() => {
+    const syncLocal = () => {
+      setPatientsQueue(listDoctorBookings(doctor.name).map(toDoctorQueueEntry));
+    };
+    syncLocal();
+    void hydrateDoctorBookings(doctor.name);
+    const unsubscribe = subscribeBookings(syncLocal);
+    const poll = window.setInterval(() => {
+      void hydrateDoctorBookings(doctor.name);
+    }, 15000);
+    return () => {
+      unsubscribe();
+      window.clearInterval(poll);
+    };
+  }, [doctor.name]);
 
   // Live video room: patient presence arrives from the patient portal.
   const roomCode = roomCodeFor(doctor.name);
   const { room: videoRoom, patientPresent, bothPresent, status: videoStatus } = useVideoRoom(roomCode);
   const [isCallOpen, setIsCallOpen] = useState(false);
   const [dismissedPatientJoin, setDismissedPatientJoin] = useState(null);
-  const waitingPatient = patientsQueue[0];
+  const waitingPatient = patientsQueue[0] || null;
   const patientJoinedAt = videoRoom?.patient?.joinedAt || null;
   const videoCompleted = videoStatus === 'completed' && !patientPresent;
   const completedAtLabel = videoRoom?.completedAt
@@ -167,60 +466,92 @@ export default function DoctorDashboardPage({ user, onLogout }) {
     : '';
   const showPatientRoomToast = Boolean(patientJoinedAt) && !isCallOpen && dismissedPatientJoin !== patientJoinedAt;
 
-  // Prescriptions list
-  const [prescriptions, setPrescriptions] = useState([
-    {
-      id: 'RX-2026-8812',
-      patientName: 'Suresh Kumar',
-      patientId: 'PT-9410',
-      date: '21 Nov 2026',
-      drug: 'Tadalafil Daily Care 5mg',
-      instructions: '1 tab daily at bedtime with water',
-      duration: '30 Days',
-      status: 'DISPATCHED',
-      type: 'Standard'
-    },
-    {
-      id: 'RX-2026-8819',
-      patientName: 'Anonymous Patient #812',
-      patientId: 'PT-9418',
-      date: '23 Nov 2026',
-      drug: 'Nayacura Pro-Delay Care Spray',
-      instructions: 'Apply 2-3 metered sprays 15 mins prior',
-      duration: '100+ Sprays',
-      status: 'REFILL REQUEST',
-      type: 'Refill Request'
-    }
-  ]);
+  // Prescriptions list — persisted per clinician account.
+  const [prescriptions, setPrescriptions] = useState(() => loadDoctorPrescriptions(doctor.name));
+  useEffect(() => {
+    setPrescriptions(loadDoctorPrescriptions(doctor.name));
+  }, [doctor.name]);
 
-  // New Rx State
-  const [newRxPatient, setNewRxPatient] = useState('Suresh Kumar');
-  const [newRxMedicine, setNewRxMedicine] = useState('Tadalafil Daily Care 5mg');
-  const [newRxDosage, setNewRxDosage] = useState('1 tablet daily at bedtime');
-  const [newRxDuration, setNewRxDuration] = useState('30 Days');
-  const [newRxNotes, setNewRxNotes] = useState('Continue aerobic exercise and adequate hydration.');
+  const pendingRefillsCount = prescriptions.filter((p) => p.status === 'REFILL REQUEST').length;
+  const emrReportsCount = patientsQueue.filter((p) => Boolean(p.labSummary)).length;
+
+  // New Rx Modal State
+  const [newRxPatient, setNewRxPatient] = useState('');
+  const [newRxMedicine, setNewRxMedicine] = useState('');
+  const [newRxDosage, setNewRxDosage] = useState('');
+  const [newRxDuration, setNewRxDuration] = useState('');
+  const [newRxNotes, setNewRxNotes] = useState('');
+
+  // Inline Queue Rx State
+  const [activeQueueRxId, setActiveQueueRxId] = useState(null);
+  const [queueRxMedicine, setQueueRxMedicine] = useState('');
+  const [queueRxDosage, setQueueRxDosage] = useState('');
+  const [queueRxDuration, setQueueRxDuration] = useState('');
+  const [queueRxNotes, setQueueRxNotes] = useState('');
+
+  const issuePrescription = ({ patientName, patientId, drug, instructions, duration, notes }) => {
+    const cleanName = String(patientName || '').trim();
+    const cleanDrug = String(drug || '').trim();
+    if (!cleanName || !cleanDrug) return false;
+    const matched = patientsQueue.find((p) => p.id === patientId || p.name === cleanName);
+    const newRx = {
+      id: `RX-${new Date().getFullYear()}-${Math.floor(1000 + Math.random() * 9000)}`,
+      patientName: cleanName,
+      patientId: patientId || matched?.id || 'Direct Rx',
+      date: new Date().toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }),
+      drug: cleanDrug,
+      instructions: String(instructions || '').trim() || 'As directed',
+      duration: String(duration || '').trim() || '—',
+      notes: String(notes || '').trim(),
+      status: 'ISSUED & SIGNED',
+      type: 'Certified Tele-Rx',
+    };
+    const next = [newRx, ...prescriptions];
+    setPrescriptions(next);
+    saveDoctorPrescriptions(doctor.name, next);
+    setPrescribedToast(`Digitally signed and issued prescription for ${cleanName}!`);
+    setTimeout(() => setPrescribedToast(null), 4000);
+    return true;
+  };
 
   const handleIssueRx = (e) => {
     e.preventDefault();
-    const newRx = {
-      id: `RX-2026-${Math.floor(1000 + Math.random() * 9000)}`,
+    if (!issuePrescription({
       patientName: newRxPatient,
-      patientId: 'PT-9410',
-      date: 'Today',
       drug: newRxMedicine,
       instructions: newRxDosage,
       duration: newRxDuration,
-      status: 'ISSUED & SIGNED',
-      type: 'Certified Tele-Rx'
-    };
-    setPrescriptions([newRx, ...prescriptions]);
+      notes: newRxNotes,
+    })) return;
+    setNewRxPatient('');
+    setNewRxMedicine('');
+    setNewRxDosage('');
+    setNewRxDuration('');
+    setNewRxNotes('');
     setIsNewRxModalOpen(false);
-    setPrescribedToast(`Digitally signed and issued prescription for ${newRxPatient}!`);
-    setTimeout(() => setPrescribedToast(null), 4000);
+  };
+
+  const handleIssueQueueRx = (e, patient) => {
+    e.preventDefault();
+    if (!issuePrescription({
+      patientName: patient.name,
+      patientId: patient.id,
+      drug: queueRxMedicine,
+      instructions: queueRxDosage,
+      duration: queueRxDuration,
+      notes: queueRxNotes,
+    })) return;
+    setQueueRxMedicine('');
+    setQueueRxDosage('');
+    setQueueRxDuration('');
+    setQueueRxNotes('');
+    setActiveQueueRxId(null);
   };
 
   const handleApproveRefill = (rxId) => {
-    setPrescriptions(prescriptions.map(p => p.id === rxId ? { ...p, status: 'APPROVED & DISPATCHED' } : p));
+    const next = prescriptions.map(p => p.id === rxId ? { ...p, status: 'APPROVED & DISPATCHED' } : p);
+    setPrescriptions(next);
+    saveDoctorPrescriptions(doctor.name, next);
     setPrescribedToast('Refill request approved and sent to pharmacy dispatch!');
     setTimeout(() => setPrescribedToast(null), 4000);
   };
@@ -249,9 +580,23 @@ export default function DoctorDashboardPage({ user, onLogout }) {
     );
   }
 
-  const filteredQueue = queueFilter === 'all' 
-    ? patientsQueue 
-    : patientsQueue.filter(p => p.type === queueFilter);
+  const nextScheduleSlotLabel = (() => {
+    if (!schedulePublished) return 'Not published yet';
+    const base = new Date();
+    for (let offset = 0; offset < 7; offset += 1) {
+      const target = new Date(base.getFullYear(), base.getMonth(), base.getDate() + offset);
+      const onlineSlots = slotsForDate(practiceSchedule, target, 'online');
+      const first = onlineSlots[0];
+      if (first) {
+        const prefix = offset === 0 ? 'Today' : offset === 1 ? 'Tomorrow' : formatDateLabel(target);
+        return `${prefix} ${first.label}`;
+      }
+    }
+    return 'No upcoming slots';
+  })();
+
+  const selectedEmrRecord = patientsQueue.find((p) => p.id === selectedEmrPatient) || patientsQueue[0] || null;
+  const filteredQueue = patientsQueue;
 
   return (
     <div className="flex min-h-screen bg-[#F5F9FF] text-[#0B234D]">
@@ -321,12 +666,16 @@ export default function DoctorDashboardPage({ user, onLogout }) {
             onClick={() => handleNavClick('profile')}
             className="flex items-center gap-3 w-full text-left group hover:opacity-90 transition"
           >
-            <div className="w-10 h-10 rounded-full bg-[#0B3B82] text-white font-bold flex items-center justify-center text-sm shrink-0 shadow-xs group-hover:ring-2 group-hover:ring-[#16A34A] transition">
-              {doctor.name.charAt(4) || 'D'}
+            <div className="w-10 h-10 rounded-full bg-[#0B3B82] text-white font-bold flex items-center justify-center text-sm shrink-0 shadow-xs group-hover:ring-2 group-hover:ring-[#16A34A] transition overflow-hidden">
+              {doctor.photoUrl ? (
+                <img src={doctor.photoUrl} alt={doctor.name} className="h-full w-full object-cover" />
+              ) : (
+                avatarLetter
+              )}
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-xs font-bold text-[#0B3B82] truncate group-hover:text-[#16A34A] transition">{doctor.name}</p>
-              <p className="text-[11px] text-slate-500 truncate">{doctor.regNo}</p>
+              <p className="text-[11px] text-slate-500 truncate">{doctor.regNo || doctor.specialty}</p>
             </div>
           </button>
         </div>
@@ -376,11 +725,15 @@ export default function DoctorDashboardPage({ user, onLogout }) {
               <button
                 type="button"
                 onClick={() => setUserMenuOpen(!userMenuOpen)}
-                className="grid h-9 w-9 place-items-center rounded-full bg-[#0B3B82] font-bold text-white text-sm hover:ring-2 hover:ring-[#16A34A] hover:ring-offset-2 transition cursor-pointer shadow-xs"
+                className="grid h-9 w-9 place-items-center rounded-full bg-[#0B3B82] font-bold text-white text-sm hover:ring-2 hover:ring-[#16A34A] hover:ring-offset-2 transition cursor-pointer shadow-xs overflow-hidden"
                 aria-label="Clinician Account Menu"
                 title="Account Menu & Sign Out"
               >
-                {doctor.name.charAt(4) || 'D'}
+                {doctor.photoUrl ? (
+                  <img src={doctor.photoUrl} alt={doctor.name} className="h-full w-full object-cover" />
+                ) : (
+                  avatarLetter
+                )}
               </button>
 
               {userMenuOpen && (
@@ -395,9 +748,11 @@ export default function DoctorDashboardPage({ user, onLogout }) {
                       <p className="font-extrabold text-[#0B3B82] text-sm truncate">{doctor.name}</p>
                       <p className="text-[11px] text-slate-500 truncate">{doctor.specialty}</p>
                       <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
-                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-[#16A34A] border border-emerald-200">
-                          {doctor.regNo}
-                        </span>
+                        {doctor.regNo && (
+                          <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-[#16A34A] border border-emerald-200">
+                            {doctor.regNo}
+                          </span>
+                        )}
                         <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-[#0B3B82]">
                           Doctor Portal
                         </span>
@@ -507,7 +862,11 @@ export default function DoctorDashboardPage({ user, onLogout }) {
                 <div className="relative z-10 max-w-2xl">
                   <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-[#0B3B82] text-xs font-bold uppercase tracking-wider mb-2">
                     <span className="w-2 h-2 rounded-full bg-[#16A34A]" />
-                    <span>MCI / NMC Certified Specialist • Reg No: {doctor.regNo}</span>
+                    <span>
+                      {doctor.regNo
+                        ? `Verified Specialist • Reg No: ${doctor.regNo}`
+                        : 'Verified Clinician Suite'}
+                    </span>
                   </div>
 
                   <h1 className="text-2xl font-extrabold tracking-tight text-[#0B3B82] sm:text-3xl">
@@ -561,8 +920,8 @@ export default function DoctorDashboardPage({ user, onLogout }) {
               <div className="mb-5 grid grid-cols-2 gap-3 lg:grid-cols-4 lg:gap-5">
                 {[
                   { key: 'queue', label: "Today's Queue", count: patientsQueue.length, note: 'Consultations', icon: Users, tone: 'bg-blue-50 text-[#0B3B82]' },
-                  { key: 'prescriptions', label: 'Pending Refills', count: '2', note: 'Medical slips', icon: FileText, tone: 'bg-emerald-50 text-[#128D28]' },
-                  { key: 'emr', label: 'EMR Labs', count: '8', note: 'Diagnostic reports', icon: FlaskConical, tone: 'bg-purple-50 text-purple-700' },
+                  { key: 'prescriptions', label: 'Pending Refills', count: pendingRefillsCount, note: 'Medical slips', icon: FileText, tone: 'bg-emerald-50 text-[#128D28]' },
+                  { key: 'emr', label: 'EMR Labs', count: emrReportsCount, note: 'Diagnostic reports', icon: FlaskConical, tone: 'bg-purple-50 text-purple-700' },
                   { key: 'video', label: 'Instant Video', count: isAcceptingInstantCalls ? 'Active' : 'Offline', note: 'Telehealth status', icon: Video, tone: 'bg-amber-50 text-amber-700' },
                 ].map(({ key, label, count, note, icon: Icon, tone }) => (
                   <button
@@ -595,55 +954,83 @@ export default function DoctorDashboardPage({ user, onLogout }) {
                         <Users className="h-5 w-5 text-[#0B3B82]" />
                         <h3 className="font-extrabold text-[#0B3B82] text-base">Next Patient Up</h3>
                       </div>
-                      <span className="px-3 py-1 rounded-full bg-emerald-50 text-[#15803D] text-xs font-extrabold border border-emerald-200">
-                        Confirmed & Checked-In
-                      </span>
+                      {waitingPatient && (
+                        <span className="px-3 py-1 rounded-full bg-emerald-50 text-[#15803D] text-xs font-extrabold border border-emerald-200">
+                          {waitingPatient.status}
+                        </span>
+                      )}
                     </div>
 
-                    <div className="mt-4">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h4 className="text-lg font-extrabold text-slate-800">Suresh Kumar (Male, 34 yrs)</h4>
-                          <p className="text-xs text-slate-500">ID: PT-9410 • Consultation #2</p>
+                    {waitingPatient ? (
+                      <div className="mt-4">
+                        <div className="flex items-center justify-between gap-2">
+                          <div>
+                            <h4 className="text-lg font-extrabold text-slate-800">
+                              {waitingPatient.name}
+                              {[waitingPatient.gender, waitingPatient.age && `${waitingPatient.age} yrs`].filter(Boolean).length > 0 && (
+                                <span className="ml-1.5 text-xs font-semibold text-slate-500">
+                                  ({[waitingPatient.gender, waitingPatient.age && `${waitingPatient.age} yrs`].filter(Boolean).join(', ')})
+                                </span>
+                              )}
+                            </h4>
+                            <p className="text-xs text-slate-500">
+                              Ref: {waitingPatient.id}
+                              {waitingPatient.phone ? ` • ${waitingPatient.phone}` : ''}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-xs font-extrabold text-[#0B3B82] block">Scheduled</span>
+                            <span className="text-xs text-slate-500">{waitingPatient.time}</span>
+                          </div>
                         </div>
-                        <div className="text-right">
-                          <span className="text-xs font-extrabold text-[#0B3B82] block">Today</span>
-                          <span className="text-xs text-slate-500">04:30 PM (Today)</span>
-                        </div>
-                      </div>
 
-                      <div className="mt-3 p-3 rounded-2xl bg-slate-50 border border-slate-200/70 text-xs space-y-1">
-                        <p className="flex items-center gap-1.5 text-slate-700">
-                          <MapPin className="h-3.5 w-3.5 text-slate-400" />
-                          <span>Private Consultation Suite 3</span>
-                        </p>
-                        <p className="text-slate-600">
-                          <strong>Chief Complaint:</strong> Erectile Vitality & Performance Anxiety Management
-                        </p>
+                        <div className="mt-3 p-3 rounded-2xl bg-slate-50 border border-slate-200/70 text-xs space-y-1">
+                          <p className="flex items-center gap-1.5 text-slate-700">
+                            <Video className="h-3.5 w-3.5 text-[#128D28]" />
+                            <span>{waitingPatient.room} • ₹{waitingPatient.fee}</span>
+                          </p>
+                          <p className="text-slate-600">
+                            <strong>Chief Complaint:</strong> {waitingPatient.chiefComplaint}
+                          </p>
+                        </div>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 p-6 text-center">
+                        <p className="text-sm font-bold text-[#0B3B82]">No patients in today&apos;s queue</p>
+                        <p className="mt-1 text-xs text-slate-500">Confirmed bookings for your slots will appear here.</p>
+                      </div>
+                    )}
                   </div>
 
                   <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedPatientRecord(patientsQueue[0])}
-                      className="text-xs font-bold text-[#0B3B82] hover:text-[#16A34A] transition flex items-center gap-1"
-                    >
-                      <span>View Full Patient EMR</span>
-                    </button>
+                    {waitingPatient ? (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => setSelectedPatientRecord(waitingPatient)}
+                          className="text-xs font-bold text-[#0B3B82] hover:text-[#16A34A] transition flex items-center gap-1"
+                        >
+                          <span>View Full Patient EMR</span>
+                        </button>
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPrescribedToast('Calling Suresh Kumar into Consultation Suite 3...');
-                        setTimeout(() => setPrescribedToast(null), 3000);
-                      }}
-                      className="px-4 py-2 rounded-full bg-[#0B3B82] hover:bg-[#072658] text-white text-xs font-bold transition shadow-xs flex items-center gap-1.5"
-                    >
-                      <span>Call Patient In</span>
-                      <ArrowRight className="h-3.5 w-3.5" />
-                    </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsCallOpen(true)}
+                          className="px-4 py-2 rounded-full bg-[#16A34A] hover:bg-[#15803D] text-white text-xs font-bold transition shadow-xs flex items-center gap-1.5"
+                        >
+                          <Video className="h-3.5 w-3.5" />
+                          <span>Start Online Call</span>
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => handleNavClick('schedule')}
+                        className="text-xs font-bold text-[#0B3B82] hover:text-[#16A34A] transition"
+                      >
+                        Publish consultation slots →
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -656,34 +1043,39 @@ export default function DoctorDashboardPage({ user, onLogout }) {
                         <h3 className="font-extrabold text-[#0B3B82] text-base">Digital E-Prescription Manager</h3>
                       </div>
                       <span className="px-3 py-1 rounded-full bg-blue-50 text-[#0B3B82] text-xs font-extrabold border border-blue-200">
-                        2 Pending Refills
+                        {pendingRefillsCount} Pending Refill{pendingRefillsCount === 1 ? '' : 's'}
                       </span>
                     </div>
 
                     <div className="mt-4 space-y-2.5">
-                      <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200/70 flex items-center justify-between">
-                        <div>
-                          <p className="text-xs font-bold text-slate-800">Tadalafil Daily Care 5mg</p>
-                          <p className="text-[11px] text-slate-500">Patient: Suresh Kumar • 30 Days supply</p>
+                      {prescriptions.length > 0 ? (
+                        prescriptions.slice(0, 2).map((rx) => (
+                          <div key={rx.id} className="p-3 rounded-2xl bg-slate-50 border border-slate-200/70 flex items-center justify-between">
+                            <div>
+                              <p className="text-xs font-bold text-slate-800">{rx.drug}</p>
+                              <p className="text-[11px] text-slate-500">Patient: {rx.patientName} • {rx.duration}</p>
+                            </div>
+                            {rx.status === 'REFILL REQUEST' ? (
+                              <button
+                                type="button"
+                                onClick={() => handleApproveRefill(rx.id)}
+                                className="px-2.5 py-1 rounded-md text-[10px] font-bold bg-amber-100 text-amber-800 hover:bg-amber-200 transition"
+                              >
+                                APPROVE REFILL →
+                              </button>
+                            ) : (
+                              <span className="px-2.5 py-1 rounded-md text-[10px] font-bold bg-emerald-50 text-[#16A34A] border border-emerald-200">
+                                {rx.status}
+                              </span>
+                            )}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 p-6 text-center">
+                          <p className="text-sm font-bold text-[#0B3B82]">No prescriptions issued yet</p>
+                          <p className="mt-1 text-xs text-slate-500">Digital prescriptions and refill requests will appear here.</p>
                         </div>
-                        <span className="px-2.5 py-1 rounded-md text-[10px] font-bold bg-emerald-50 text-[#16A34A] border border-emerald-200">
-                          DISPATCHED
-                        </span>
-                      </div>
-
-                      <div className="p-3 rounded-2xl bg-amber-50/60 border border-amber-200/70 flex items-center justify-between">
-                        <div>
-                          <p className="text-xs font-bold text-slate-800">Nayacura Pro-Delay Care Spray</p>
-                          <p className="text-[11px] text-slate-500">Patient: Anonymous #812 • Metered Spray</p>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => handleApproveRefill('RX-2026-8819')}
-                          className="px-2.5 py-1 rounded-md text-[10px] font-bold bg-amber-100 text-amber-800 hover:bg-amber-200 transition"
-                        >
-                          APPROVE REFILL →
-                        </button>
-                      </div>
+                      )}
                     </div>
                   </div>
 
@@ -716,42 +1108,44 @@ export default function DoctorDashboardPage({ user, onLogout }) {
                         <h3 className="font-extrabold text-[#0B3B82] text-base">Electronic Medical Records (EMR)</h3>
                       </div>
                       <span className="px-3 py-1 rounded-full bg-purple-50 text-purple-700 text-xs font-extrabold border border-purple-200">
-                        NABL Verified
+                        {emrReportsCount} Reports
                       </span>
                     </div>
 
-                    <div className="mt-4 p-4 rounded-2xl bg-slate-50 border border-slate-200/70 text-xs space-y-2">
-                      <div className="flex items-center justify-between font-bold text-slate-800 pb-2 border-b border-slate-200">
-                        <span>Patient: Suresh Kumar (PT-9410)</span>
-                        <span className="text-emerald-700">Lab Panel Complete</span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2 text-[11px] pt-1">
-                        <div>
-                          <p className="text-slate-500">7-Panel STI Screen:</p>
-                          <p className="font-bold text-emerald-700">All Non-Reactive (Negative)</p>
+                    {selectedEmrRecord ? (
+                      <div className="mt-4 p-4 rounded-2xl bg-slate-50 border border-slate-200/70 text-xs space-y-2">
+                        <div className="flex items-center justify-between font-bold text-slate-800 pb-2 border-b border-slate-200">
+                          <span>Patient: {selectedEmrRecord.name} ({selectedEmrRecord.id})</span>
+                          <span className="text-emerald-700">Record Ready</span>
                         </div>
-                        <div>
-                          <p className="text-slate-500">Serum Total Testosterone:</p>
-                          <p className="font-bold text-[#0B3B82]">624 ng/dL (Normal Range)</p>
-                        </div>
+                        <p className="text-slate-600">{selectedEmrRecord.history || 'No lab summary attached yet.'}</p>
                       </div>
-                    </div>
+                    ) : (
+                      <div className="mt-4 rounded-2xl border border-dashed border-slate-200 bg-slate-50/70 p-6 text-center">
+                        <p className="text-sm font-bold text-[#0B3B82]">No EMR lab reports yet</p>
+                        <p className="mt-1 text-xs text-slate-500">Diagnostic panels shared by your patients will appear here.</p>
+                      </div>
+                    )}
                   </div>
 
                   <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
-                    <button
-                      type="button"
-                      onClick={() => setSelectedPatientRecord(patientsQueue[0])}
-                      className="font-bold text-xs text-[#0B3B82] hover:text-[#16A34A] transition"
-                    >
-                      Review Full Diagnostic Chart →
-                    </button>
+                    {selectedEmrRecord ? (
+                      <button
+                        type="button"
+                        onClick={() => setSelectedPatientRecord(selectedEmrRecord)}
+                        className="font-bold text-xs text-[#0B3B82] hover:text-[#16A34A] transition"
+                      >
+                        Review Full Diagnostic Chart →
+                      </button>
+                    ) : (
+                      <span className="text-xs text-slate-400">Encrypted clinician EMR vault</span>
+                    )}
                     <button
                       type="button"
                       onClick={() => handleNavClick('emr')}
-                      className="text-xs text-slate-500 hover:text-slate-700 transition"
+                      className="text-xs font-bold text-[#0B3B82] hover:text-[#16A34A] transition"
                     >
-                      Search All EMRs
+                      Open EMR Section
                     </button>
                   </div>
                 </div>
@@ -764,8 +1158,12 @@ export default function DoctorDashboardPage({ user, onLogout }) {
                         <Clock className="h-5 w-5 text-[#0B3B82]" />
                         <h3 className="font-extrabold text-[#0B3B82] text-base">Practice Schedule & Availability</h3>
                       </div>
-                      <span className="px-3 py-1 rounded-full bg-emerald-50 text-[#15803D] text-xs font-extrabold border border-emerald-200">
-                        ACTIVE
+                      <span className={`px-3 py-1 rounded-full text-xs font-extrabold border ${
+                        schedulePublished
+                          ? 'bg-emerald-50 text-[#15803D] border-emerald-200'
+                          : 'bg-slate-100 text-slate-600 border-slate-200'
+                      }`}>
+                        {schedulePublished ? 'ACTIVE' : 'NOT SET'}
                       </span>
                     </div>
 
@@ -786,16 +1184,27 @@ export default function DoctorDashboardPage({ user, onLogout }) {
                         </button>
                       </div>
 
-                      <div className="mt-3 text-xs text-slate-600 space-y-1">
-                        <p>📍 <strong>Chennai Nungambakkam Clinic:</strong> 02:00 PM – 07:00 PM</p>
-                        <p>💻 <strong>Nayacura Telehealth Suite:</strong> 07:30 PM – 09:30 PM</p>
-                      </div>
+                      {schedulePublished ? (
+                        <div className="mt-3 text-xs text-slate-600 space-y-1">
+                          <p className="flex items-center gap-1.5">
+                            <Video className="h-3.5 w-3.5 shrink-0 text-[#128D28]" aria-hidden="true" />
+                            <span>
+                              <strong>Online Consultation (Video &amp; Audio):</strong>{' '}
+                              {formatTime(practiceSchedule.modes?.online?.start || practiceSchedule.modes?.video?.start || '14:00')} – {formatTime(practiceSchedule.modes?.online?.end || practiceSchedule.modes?.video?.end || '19:00')}
+                            </span>
+                          </p>
+                        </div>
+                      ) : (
+                        <p className="mt-3 text-xs text-slate-500">
+                          No consultation hours saved yet. Configure your online consultation slots to appear in Consult Sexology.
+                        </p>
+                      )}
                     </div>
                   </div>
 
                   <div className="mt-6 pt-4 border-t border-slate-100 flex flex-col gap-2 text-xs sm:flex-row sm:items-center sm:justify-between">
                     <span className="text-slate-500">
-                      Next available slot: <strong>Tomorrow 10:30 AM</strong>
+                      Next available slot: <strong>{nextScheduleSlotLabel}</strong>
                     </span>
                     <button
                       type="button"
@@ -816,91 +1225,220 @@ export default function DoctorDashboardPage({ user, onLogout }) {
             <div className="space-y-5 animate-fade-in">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 rounded-2xl bg-white border border-[#DCE7F6] shadow-sm">
                 <div>
-                  <h3 className="text-lg font-extrabold text-[#0B3B82]">Today's Scheduled Consultations</h3>
-                  <p className="text-xs text-slate-500 mt-1">Review check-in status, triage priority, and initiate private sessions.</p>
+                  <h3 className="text-lg font-extrabold text-[#0B3B82]">Today&apos;s Scheduled Consultations</h3>
+                  <p className="text-xs text-slate-500 mt-1">Review check-in status and join private online consultations (Video or Audio anytime during call).</p>
                 </div>
-                <div className="flex items-center gap-2">
-                  {['all', 'clinic', 'video'].map(tab => (
-                    <button
-                      key={tab}
-                      type="button"
-                      onClick={() => setQueueFilter(tab)}
-                      className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition capitalize ${
-                        queueFilter === tab
-                          ? 'bg-[#0B3B82] text-white shadow-xs'
-                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                      }`}
-                    >
-                      {tab === 'all' ? 'All (4)' : tab === 'clinic' ? 'In-Clinic (2)' : 'Encrypted Video (2)'}
-                    </button>
-                  ))}
-                </div>
+                <span className="rounded-full bg-blue-50 px-3.5 py-1.5 text-xs font-bold text-[#0B3B82]">
+                  Online Consultations ({patientsQueue.length})
+                </span>
               </div>
 
-              <div className="space-y-3">
-                {filteredQueue.map((patient) => (
-                  <div key={patient.id} className="p-5 rounded-2xl bg-white border border-[#DCE7F6] shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4 hover:border-[#16A34A] transition">
-                    <div className="space-y-1.5">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-extrabold text-base text-[#0B3B82]">{patient.name}</span>
-                        <span className="text-xs text-slate-400">({patient.gender}, {patient.age} yrs)</span>
-                        <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-[#0B3B82] border border-blue-200">
-                          {patient.id}
-                        </span>
-                        <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${
-                          patient.type === 'clinic' ? 'bg-emerald-50 text-[#16A34A] border border-emerald-200' : 'bg-purple-50 text-purple-700 border border-purple-200'
-                        }`}>
-                          {patient.type === 'clinic' ? '📍 In-Clinic' : '💻 Telehealth Video'}
-                        </span>
-                        {patient.name === waitingPatient?.name && videoCompleted && (
-                          <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-[#128D28] border border-emerald-200">
-                            ✓ Completed
-                          </span>
-                        )}
+              {filteredQueue.length === 0 ? (
+                <div className="rounded-2xl border border-[#DCE7F6] bg-white p-10 text-center shadow-xs">
+                  <Users className="mx-auto h-9 w-9 text-slate-300" />
+                  <p className="mt-3 text-base font-extrabold text-[#0B3B82]">No scheduled consultations yet</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    When patients book an online consultation slot from your published schedule, they will appear here.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {filteredQueue.map((patient) => {
+                    const demoMeta = [patient.gender, patient.age && `${patient.age} yrs`].filter(Boolean).join(', ');
+                    const isRxComposerOpen = activeQueueRxId === patient.id;
+                    const patientPrescriptions = prescriptions.filter(
+                      (rx) => rx.patientId === patient.id || rx.patientName === patient.name
+                    );
+                    return (
+                    <div key={patient.id} className="p-5 rounded-2xl bg-white border border-[#DCE7F6] shadow-xs flex flex-col gap-4 hover:border-[#16A34A] transition">
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div className="space-y-1.5">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-extrabold text-base text-[#0B3B82]">{patient.name}</span>
+                            {demoMeta && <span className="text-xs text-slate-400">({demoMeta})</span>}
+                            <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-blue-50 text-[#0B3B82] border border-blue-200">
+                              {patient.id}
+                            </span>
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-[#16A34A] border border-emerald-200">
+                              <Video className="h-3 w-3" aria-hidden="true" />
+                              Online (Video / Audio)
+                            </span>
+                            {patient.name === waitingPatient?.name && videoCompleted && (
+                              <span className="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-[#128D28] border border-emerald-200">
+                                ✓ Completed
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-slate-600">
+                            <strong>Chief Complaint:</strong> {patient.chiefComplaint}
+                          </p>
+                          <p className="text-[11px] text-slate-500">
+                            Scheduled for: <strong>{patient.time}</strong>
+                            {patient.phone ? ` • Phone: ${patient.phone}` : ''}
+                            {patient.fee ? ` • Fee: ₹${patient.fee}` : ''}
+                          </p>
+                        </div>
+
+                        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (isRxComposerOpen) {
+                                setActiveQueueRxId(null);
+                              } else {
+                                setQueueRxMedicine('');
+                                setQueueRxDosage('');
+                                setQueueRxDuration('');
+                                setQueueRxNotes('');
+                                setActiveQueueRxId(patient.id);
+                              }
+                            }}
+                            aria-expanded={isRxComposerOpen}
+                            className={`px-4 py-2 rounded-xl border text-xs font-bold transition flex items-center gap-1.5 ${
+                              isRxComposerOpen
+                                ? 'border-[#0B3B82] bg-blue-50 text-[#0B3B82]'
+                                : 'border-[#DCE7F6] bg-[#F8FAFC] hover:bg-blue-50 text-[#0B3B82]'
+                            }`}
+                          >
+                            <FileText className="h-3.5 w-3.5" aria-hidden="true" />
+                            <span>Write Rx</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setSelectedPatientRecord(patient)}
+                            className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
+                          >
+                            View Full EMR
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setIsCallOpen(true)}
+                            className="px-5 py-2 rounded-xl bg-[#16A34A] hover:bg-[#15803D] text-white text-xs font-bold transition shadow-xs flex items-center gap-1.5"
+                          >
+                            <Video className="h-3.5 w-3.5" />
+                            <span>{videoCompleted ? 'Rejoin Call' : 'Start Online Call'}</span>
+                          </button>
+                        </div>
                       </div>
-                      <p className="text-xs text-slate-600">
-                        <strong>Chief Complaint:</strong> {patient.chiefComplaint}
-                      </p>
-                      <p className="text-[11px] text-slate-500">
-                        Scheduled for: <strong>{patient.time}</strong> • Location/Room: <strong>{patient.room}</strong>
-                      </p>
-                    </div>
 
-                    <div className="flex items-center gap-3 shrink-0">
-                      <button
-                        type="button"
-                        onClick={() => setSelectedPatientRecord(patient)}
-                        className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-50 transition"
-                      >
-                        View Full EMR
-                      </button>
+                      {patientPrescriptions.length > 0 && (
+                        <div className="pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            {patientPrescriptions.map((rx) => (
+                              <span
+                                key={rx.id}
+                                className="inline-flex items-center gap-1.5 px-3 py-1 rounded-lg bg-emerald-50 border border-emerald-200 text-xs font-semibold text-[#128D28]"
+                              >
+                                ✓ Rx Issued: {rx.drug} • {rx.instructions} • {rx.duration}
+                              </span>
+                            ))}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => handleNavClick('prescriptions')}
+                            className="text-xs font-bold text-[#0B3B82] hover:underline shrink-0"
+                          >
+                            View in E-Prescriptions
+                          </button>
+                        </div>
+                      )}
 
-                      {patient.type === 'clinic' ? (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setPrescribedToast(`Calling ${patient.name} into ${patient.room}...`);
-                            setTimeout(() => setPrescribedToast(null), 3000);
-                          }}
-                          className="px-5 py-2 rounded-xl bg-[#0B3B82] hover:bg-[#072658] text-white text-xs font-bold transition shadow-xs flex items-center gap-1.5"
+                      {isRxComposerOpen && (
+                        <form
+                          onSubmit={(e) => handleIssueQueueRx(e, patient)}
+                          className="p-4 rounded-xl bg-[#F8FBFF] border border-[#DCE7F6] space-y-3"
                         >
-                          <span>Call Patient In</span>
-                          <ArrowRight className="h-3.5 w-3.5" />
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => setIsCallOpen(true)}
-                          className="px-5 py-2 rounded-xl bg-[#16A34A] hover:bg-[#15803D] text-white text-xs font-bold transition shadow-xs flex items-center gap-1.5"
-                        >
-                          <Video className="h-3.5 w-3.5" />
-                          <span>{videoCompleted ? 'Rejoin' : 'Start Video'}</span>
-                        </button>
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <FileText className="h-4 w-4 text-[#0B3B82]" aria-hidden="true" />
+                              <span className="text-xs font-extrabold text-[#0B3B82]">
+                                Digital E-Prescription for {patient.name}
+                              </span>
+                            </div>
+                            <span className="text-[11px] font-semibold text-slate-500">
+                              Ref: {patient.id}
+                            </span>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <div>
+                              <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                                Medication / Formulation
+                              </label>
+                              <input
+                                type="text"
+                                required
+                                value={queueRxMedicine}
+                                onChange={(e) => setQueueRxMedicine(e.target.value)}
+                                placeholder="Enter medication or formulation"
+                                className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-800 focus:outline-none focus:border-[#0B3B82]"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                                Dosage &amp; Timing
+                              </label>
+                              <input
+                                type="text"
+                                required
+                                value={queueRxDosage}
+                                onChange={(e) => setQueueRxDosage(e.target.value)}
+                                placeholder="e.g. 1 tablet at bedtime"
+                                className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-800 focus:outline-none focus:border-[#0B3B82]"
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                                Duration
+                              </label>
+                              <input
+                                type="text"
+                                required
+                                value={queueRxDuration}
+                                onChange={(e) => setQueueRxDuration(e.target.value)}
+                                placeholder="e.g. 15 Days"
+                                className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-800 focus:outline-none focus:border-[#0B3B82]"
+                              />
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-[11px] font-bold text-slate-600 mb-1">
+                              Clinical Advice / Diet Notes
+                            </label>
+                            <textarea
+                              rows="2"
+                              value={queueRxNotes}
+                              onChange={(e) => setQueueRxNotes(e.target.value)}
+                              placeholder="Enter clinical instructions..."
+                              className="w-full px-3 py-2 rounded-lg border border-slate-200 bg-white text-xs text-slate-800 focus:outline-none focus:border-[#0B3B82] resize-none"
+                            />
+                          </div>
+
+                          <div className="flex items-center justify-end gap-2 pt-1">
+                            <button
+                              type="button"
+                              onClick={() => setActiveQueueRxId(null)}
+                              className="px-3.5 py-2 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-600 transition"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="submit"
+                              className="px-4 py-2 rounded-lg bg-[#0B3B82] hover:bg-[#092C63] text-white text-xs font-bold transition shadow-xs"
+                            >
+                              Sign &amp; Issue Prescription
+                            </button>
+                          </div>
+                        </form>
                       )}
                     </div>
-                  </div>
-                ))}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           )}
 
@@ -925,9 +1463,9 @@ export default function DoctorDashboardPage({ user, onLogout }) {
                       {patientPresent ? (
                         <>
                           <div className="mb-2 flex h-16 w-16 items-center justify-center rounded-full bg-[#16A34A] text-xl font-bold">
-                            {(waitingPatient?.name || 'P').charAt(0)}
+                            {(videoRoom?.patient?.name || waitingPatient?.name || 'P').charAt(0)}
                           </div>
-                          <p className="font-extrabold text-base">{waitingPatient?.name || 'Patient'}</p>
+                          <p className="font-extrabold text-base">{videoRoom?.patient?.name || waitingPatient?.name || 'Patient'}</p>
                           <p className="text-xs text-slate-400">{bothPresent ? 'Patient is connected' : 'Patient is waiting in the room'}</p>
                         </>
                       ) : videoCompleted ? (
@@ -941,7 +1479,7 @@ export default function DoctorDashboardPage({ user, onLogout }) {
                       ) : (
                         <>
                           <div className="mb-2 flex h-16 w-16 items-center justify-center rounded-full bg-[#0B3B82] text-xl font-bold">
-                            {doctor.name.charAt(4)}
+                            {avatarLetter}
                           </div>
                           <p className="font-extrabold text-base">{doctor.name}</p>
                           <p className="text-xs text-slate-400">{doctor.specialty} (Ready)</p>
@@ -978,9 +1516,25 @@ export default function DoctorDashboardPage({ user, onLogout }) {
                   <div className="space-y-4">
                     <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
                       <h4 className="font-bold text-xs text-[#0B3B82] uppercase tracking-wider mb-2">Connected Patient</h4>
-                      <p className="font-extrabold text-slate-800 text-sm">{waitingPatient?.name || 'Suresh Kumar'}</p>
-                      <p className="text-xs text-slate-500">Scheduled: 04:30 PM • 30 mins slot</p>
-                      <p className="text-xs text-slate-600 mt-2"><strong>Complaint:</strong> Performance Anxiety & Vitality</p>
+                      {patientPresent || waitingPatient ? (
+                        <>
+                          <p className="font-extrabold text-slate-800 text-sm">
+                            {videoRoom?.patient?.name || waitingPatient?.name || 'Patient'}
+                          </p>
+                          {waitingPatient && (
+                            <>
+                              <p className="text-xs text-slate-500">Scheduled: {waitingPatient.time}</p>
+                              <p className="text-xs text-slate-600 mt-2">
+                                <strong>Complaint:</strong> {waitingPatient.chiefComplaint}
+                              </p>
+                            </>
+                          )}
+                        </>
+                      ) : (
+                        <p className="text-xs text-slate-500">
+                          No patient in the waiting room yet.
+                        </p>
+                      )}
                       <p className={`mt-3 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold ${patientPresent ? 'bg-emerald-100 text-[#15803D]' : videoCompleted ? 'bg-slate-100 text-slate-600' : 'bg-slate-200 text-slate-600'}`}>
                         <span className={`h-1.5 w-1.5 rounded-full ${patientPresent ? 'bg-emerald-500 animate-pulse' : videoCompleted ? 'bg-emerald-500' : 'bg-slate-400'}`} />
                         {bothPresent ? 'Both in room — connected' : patientPresent ? 'Patient in the waiting room' : videoCompleted ? 'Consultation completed' : 'Waiting for patient'}
@@ -1008,7 +1562,7 @@ export default function DoctorDashboardPage({ user, onLogout }) {
                       </button>
                       <button
                         type="button"
-                        onClick={() => setSelectedPatientRecord(patientsQueue[0])}
+                        onClick={() => (waitingPatient ? setSelectedPatientRecord(waitingPatient) : handleNavClick('emr'))}
                         className="w-full py-2.5 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-100 text-xs font-bold transition"
                       >
                         Open Patient EMR Chart
@@ -1038,54 +1592,64 @@ export default function DoctorDashboardPage({ user, onLogout }) {
                 </button>
               </div>
 
-              {/* Prescriptions History Table */}
-              <div className="rounded-2xl bg-white border border-[#DCE7F6] shadow-sm overflow-hidden">
-                <div className="hidden sm:grid grid-cols-12 gap-2 p-4 bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-600">
-                  <span className="col-span-3">Patient & ID</span>
-                  <span className="col-span-4">Formulation & Dosage</span>
-                  <span className="col-span-2">Date & Duration</span>
-                  <span className="col-span-3 text-right">Status & Action</span>
+              {prescriptions.length === 0 ? (
+                <div className="rounded-2xl border border-[#DCE7F6] bg-white p-10 text-center shadow-sm">
+                  <FileText className="mx-auto h-9 w-9 text-slate-300" />
+                  <p className="mt-3 text-base font-extrabold text-[#0B3B82]">No prescriptions issued yet</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Click &ldquo;+ Create New Digital Rx&rdquo; to issue a digitally signed prescription.
+                  </p>
                 </div>
+              ) : (
+                /* Prescriptions History Table */
+                <div className="rounded-2xl bg-white border border-[#DCE7F6] shadow-sm overflow-hidden">
+                  <div className="hidden sm:grid grid-cols-12 gap-2 p-4 bg-slate-50 border-b border-slate-200 text-xs font-bold text-slate-600">
+                    <span className="col-span-3">Patient & ID</span>
+                    <span className="col-span-4">Formulation & Dosage</span>
+                    <span className="col-span-2">Date & Duration</span>
+                    <span className="col-span-3 text-right">Status & Action</span>
+                  </div>
 
-                <div className="divide-y divide-slate-100">
-                  {prescriptions.map((rx) => (
-                    <div key={rx.id} className="grid grid-cols-1 items-start gap-3 p-4 text-xs transition hover:bg-slate-50/60 sm:grid-cols-12 sm:items-center sm:gap-2">
-                      <div className="sm:col-span-3">
-                        <p className="font-extrabold text-slate-800">{rx.patientName}</p>
-                        <p className="text-[11px] text-slate-500">{rx.id} • {rx.patientId}</p>
+                  <div className="divide-y divide-slate-100">
+                    {prescriptions.map((rx) => (
+                      <div key={rx.id} className="grid grid-cols-1 items-start gap-3 p-4 text-xs transition hover:bg-slate-50/60 sm:grid-cols-12 sm:items-center sm:gap-2">
+                        <div className="sm:col-span-3">
+                          <p className="font-extrabold text-slate-800">{rx.patientName}</p>
+                          <p className="text-[11px] text-slate-500">{rx.id} • {rx.patientId}</p>
+                        </div>
+                        <div className="sm:col-span-4">
+                          <p className="font-bold text-[#0B3B82]">{rx.drug}</p>
+                          <p className="text-[11px] text-slate-500">{rx.instructions}</p>
+                        </div>
+                        <div className="flex items-center gap-3 sm:col-span-2 sm:block">
+                          <p className="font-medium text-slate-700">{rx.date}</p>
+                          <p className="text-[11px] text-slate-500">{rx.duration}</p>
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2 sm:col-span-3 sm:block sm:text-right">
+                          <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                            rx.status.includes('DISPATCHED') || rx.status.includes('SIGNED')
+                              ? 'bg-emerald-50 text-[#16A34A] border border-emerald-200'
+                              : 'bg-amber-50 text-amber-800 border border-amber-200'
+                          }`}>
+                            {rx.status}
+                          </span>
+                          {rx.status === 'REFILL REQUEST' && (
+                            <div className="sm:mt-1">
+                              <button
+                                type="button"
+                                onClick={() => handleApproveRefill(rx.id)}
+                                className="px-3 py-1.5 rounded-lg bg-[#16A34A] text-white text-[11px] font-bold hover:bg-[#15803D] transition sm:ml-auto"
+                              >
+                                Approve Refill
+                              </button>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <div className="sm:col-span-4">
-                        <p className="font-bold text-[#0B3B82]">{rx.drug}</p>
-                        <p className="text-[11px] text-slate-500">{rx.instructions}</p>
-                      </div>
-                      <div className="flex items-center gap-3 sm:col-span-2 sm:block">
-                        <p className="font-medium text-slate-700">{rx.date}</p>
-                        <p className="text-[11px] text-slate-500">{rx.duration}</p>
-                      </div>
-                      <div className="flex flex-wrap items-center gap-2 sm:col-span-3 sm:block sm:text-right">
-                        <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
-                          rx.status.includes('DISPATCHED') || rx.status.includes('SIGNED')
-                            ? 'bg-emerald-50 text-[#16A34A] border border-emerald-200'
-                            : 'bg-amber-50 text-amber-800 border border-amber-200'
-                        }`}>
-                          {rx.status}
-                        </span>
-                        {rx.status === 'REFILL REQUEST' && (
-                          <div className="sm:mt-1">
-                            <button
-                              type="button"
-                              onClick={() => handleApproveRefill(rx.id)}
-                              className="px-3 py-1.5 rounded-lg bg-[#16A34A] text-white text-[11px] font-bold hover:bg-[#15803D] transition sm:ml-auto"
-                            >
-                              Approve Refill
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
             </div>
           )}
 
@@ -1097,155 +1661,76 @@ export default function DoctorDashboardPage({ user, onLogout }) {
                   <h3 className="text-lg font-extrabold text-[#0B3B82]">Electronic Medical Records (EMR)</h3>
                   <p className="text-xs text-slate-500 mt-1">NABL Accredited diagnostic reports, STI screens, and endocrine blood profiles.</p>
                 </div>
-                <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
-                  <span className="text-xs font-bold text-slate-500">Selected Patient:</span>
-                  <select
-                    value={selectedEmrPatient}
-                    onChange={(e) => setSelectedEmrPatient(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold text-[#0B3B82] bg-white focus:outline-none sm:w-auto sm:py-1.5"
-                  >
-                    <option value="PT-9410">Suresh Kumar (PT-9410)</option>
-                    <option value="PT-9418">Anonymous Patient #812 (PT-9418)</option>
-                    <option value="PT-9422">Karthik Raja (PT-9422)</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Diagnostics Detail Card */}
-              <div className="p-6 rounded-2xl bg-white border border-[#DCE7F6] shadow-sm space-y-6">
-                <div className="flex flex-col gap-3 pb-4 border-b border-slate-200 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
-                      NABL & CAP Accredited Laboratory
-                    </span>
-                    <h4 className="text-base font-extrabold text-slate-800 mt-1">7-Panel Confidential STI Screen & Hormone Profile</h4>
-                    <p className="text-xs text-slate-500">Specimen collected: 21 Nov 2026 • Verified by Pathologist Dr. R. Ramanathan, MD</p>
-                  </div>
-                  <span className="self-start px-3 py-1 rounded-full bg-emerald-50 text-[#16A34A] text-xs font-extrabold border border-emerald-200">
-                    ALL NON-REACTIVE (NORMAL)
-                  </span>
-                </div>
-
-                {/* STI Screen Table */}
-                <div>
-                  <h5 className="text-xs font-bold text-[#0B3B82] uppercase tracking-wider mb-2">1. STI Pathogen Multiplex Panel</h5>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
-                    {[
-                      { test: 'HIV 1 & 2 4th Gen Ag/Ab', result: 'Non-Reactive', status: 'Negative' },
-                      { test: 'Syphilis (VDRL / RPR)', result: 'Non-Reactive', status: 'Negative' },
-                      { test: 'Hepatitis B (HBsAg)', result: 'Non-Reactive', status: 'Negative' },
-                      { test: 'Hepatitis C (Anti-HCV)', result: 'Non-Reactive', status: 'Negative' },
-                      { test: 'Herpes Simplex HSV-1 IgG', result: '0.12 (Index)', status: 'Negative' },
-                      { test: 'Herpes Simplex HSV-2 IgG', result: '0.08 (Index)', status: 'Negative' },
-                      { test: 'Chlamydia Trachomatis PCR', result: 'Not Detected', status: 'Negative' },
-                      { test: 'Neisseria Gonorrhoeae PCR', result: 'Not Detected', status: 'Negative' },
-                    ].map((item, idx) => (
-                      <div key={idx} className="p-3 rounded-xl bg-slate-50 border border-slate-200/80">
-                        <p className="font-bold text-slate-700 text-[11px] truncate">{item.test}</p>
-                        <p className="font-extrabold text-[#16A34A] mt-1">{item.result}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Endocrine Profile */}
-                <div>
-                  <h5 className="text-xs font-bold text-[#0B3B82] uppercase tracking-wider mb-2">2. Endocrine & Vitality Biomarkers</h5>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                    <div className="p-3.5 rounded-xl bg-blue-50/50 border border-blue-200">
-                      <p className="text-slate-500 text-[11px]">Serum Total Testosterone</p>
-                      <p className="text-lg font-extrabold text-[#0B3B82]">624 ng/dL</p>
-                      <p className="text-[10px] text-slate-500">Biological Reference: 280 – 850 ng/dL</p>
-                    </div>
-
-                    <div className="p-3.5 rounded-xl bg-emerald-50/50 border border-emerald-200">
-                      <p className="text-slate-500 text-[11px]">Free Testosterone (ECLIA)</p>
-                      <p className="text-lg font-extrabold text-[#16A34A]">17.8 pg/mL</p>
-                      <p className="text-[10px] text-slate-500">Biological Reference: 8.5 – 25.0 pg/mL</p>
-                    </div>
-
-                    <div className="p-3.5 rounded-xl bg-purple-50/50 border border-purple-200">
-                      <p className="text-slate-500 text-[11px]">Serum Prolactin</p>
-                      <p className="text-lg font-extrabold text-purple-700">8.4 ng/mL</p>
-                      <p className="text-[10px] text-slate-500">Biological Reference: 2.5 – 17.0 ng/mL</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Clinical Notes Editor */}
-                <div className="pt-4 border-t border-slate-200">
-                  <h5 className="text-xs font-bold text-[#0B3B82] uppercase tracking-wider mb-2">Doctor Clinical Consultation Notes</h5>
-                  <textarea
-                    rows={3}
-                    defaultValue="Patient Suresh Kumar presenting with psychogenic performance anxiety in second consultation. Biomarkers rule out physiological hypogonadism. Prescribed low-dose daily Tadalafil 5mg alongside stress-regulation protocols."
-                    className="w-full p-3 rounded-xl border border-slate-300 text-xs text-slate-700 focus:outline-none focus:border-[#0B3B82]"
-                  />
-                  <div className="mt-2 flex justify-end">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPrescribedToast('Clinical notes auto-saved to encrypted EMR database.');
-                        setTimeout(() => setPrescribedToast(null), 3000);
-                      }}
-                      className="px-4 py-2 rounded-xl bg-[#0B3B82] text-white text-xs font-bold hover:bg-[#072658] transition"
+                {patientsQueue.length > 0 && (
+                  <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+                    <span className="text-xs font-bold text-slate-500">Selected Patient:</span>
+                    <select
+                      value={selectedEmrRecord?.id || ''}
+                      onChange={(e) => setSelectedEmrPatient(e.target.value)}
+                      className="w-full px-3 py-2 rounded-xl border border-slate-300 text-xs font-bold text-[#0B3B82] bg-white focus:outline-none sm:w-auto sm:py-1.5"
                     >
-                      Save EMR Notes
-                    </button>
+                      {patientsQueue.map((patient) => (
+                        <option key={patient.id} value={patient.id}>
+                          {patient.name} ({patient.id})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {selectedEmrRecord ? (
+                <div className="p-6 rounded-2xl bg-white border border-[#DCE7F6] shadow-sm space-y-6">
+                  <div className="flex flex-col gap-3 pb-4 border-b border-slate-200 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-50 text-purple-700 border border-purple-200">
+                        Encrypted Patient Record
+                      </span>
+                      <h4 className="text-base font-extrabold text-slate-800 mt-1">
+                        {selectedEmrRecord.name} ({selectedEmrRecord.id})
+                      </h4>
+                      <p className="text-xs text-slate-500">{selectedEmrRecord.history || 'No lab summary uploaded yet.'}</p>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 border-t border-slate-200">
+                    <h5 className="text-xs font-bold text-[#0B3B82] uppercase tracking-wider mb-2">Doctor Clinical Consultation Notes</h5>
+                    <textarea
+                      rows={3}
+                      defaultValue=""
+                      placeholder="Enter confidential consultation notes..."
+                      className="w-full p-3 rounded-xl border border-slate-300 text-xs text-slate-700 focus:outline-none focus:border-[#0B3B82]"
+                    />
+                    <div className="mt-2 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPrescribedToast('Clinical notes saved to encrypted EMR database.');
+                          setTimeout(() => setPrescribedToast(null), 3000);
+                        }}
+                        className="px-4 py-2 rounded-xl bg-[#0B3B82] text-white text-xs font-bold hover:bg-[#072658] transition"
+                      >
+                        Save EMR Notes
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
+              ) : (
+                <div className="rounded-2xl border border-[#DCE7F6] bg-white p-10 text-center shadow-sm">
+                  <FlaskConical className="mx-auto h-9 w-9 text-slate-300" />
+                  <p className="mt-3 text-base font-extrabold text-[#0B3B82]">No patient diagnostic records yet</p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    Once patients book consultations and share lab reports with you, their EMR charts will appear here.
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
           {/* ==================== F. PRACTICE SCHEDULE ==================== */}
           {activeSection === 'schedule' && (
-            <div className="space-y-5 animate-fade-in">
-              <div className="p-5 rounded-2xl bg-white border border-[#DCE7F6] shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <h3 className="text-lg font-extrabold text-[#0B3B82]">Practice Schedule & Telehealth Windows</h3>
-                  <p className="text-xs text-slate-500 mt-1">Configure appointment slots for in-person clinic and encrypted video calls.</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs font-bold ${isAcceptingInstantCalls ? 'text-[#16A34A]' : 'text-slate-500'}`}>
-                    {isAcceptingInstantCalls ? 'ONLINE (Accepting)' : 'OFFLINE'}
-                  </span>
-                  <button type="button" role="switch" aria-checked={isAcceptingInstantCalls} aria-label="Accept instant video consults" onClick={() => setIsAcceptingInstantCalls(!isAcceptingInstantCalls)}
-                    className={`toggle-switch flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
-                      isAcceptingInstantCalls ? 'bg-[#16A34A]' : 'bg-slate-300'
-                    }`}
-                  >
-                    <span className={`block h-5 w-5 rounded-full bg-white shadow-sm transition-transform ${
-                      isAcceptingInstantCalls ? 'translate-x-5' : 'translate-x-0.5'
-                    }`} />
-                  </button>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div className="p-5 rounded-2xl bg-white border border-[#DCE7F6] shadow-xs space-y-4">
-                  <h4 className="font-extrabold text-[#0B3B82] text-sm">📍 In-Person Clinic Hours (Nungambakkam)</h4>
-                  <div className="space-y-2 text-xs">
-                    {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((day) => (
-                      <div key={day} className="flex items-center justify-between p-2.5 rounded-xl bg-slate-50 border border-slate-100">
-                        <span className="font-bold text-slate-700">{day}</span>
-                        <span className="text-[#0B3B82] font-semibold">02:00 PM – 07:00 PM (10 Slots)</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="p-5 rounded-2xl bg-white border border-[#DCE7F6] shadow-xs space-y-4">
-                  <h4 className="font-extrabold text-[#0B3B82] text-sm">💻 Encrypted Telehealth Evening Suite</h4>
-                  <div className="space-y-2 text-xs">
-                    {['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map((day) => (
-                      <div key={day} className="flex items-center justify-between p-2.5 rounded-xl bg-emerald-50/40 border border-emerald-100">
-                        <span className="font-bold text-slate-700">{day}</span>
-                        <span className="text-[#16A34A] font-semibold">07:30 PM – 09:30 PM (4 Slots)</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
+            <div className="animate-fade-in">
+              <PracticeScheduleEditor doctorName={doctor.name} onNotify={showDoctorToast} />
             </div>
           )}
 
@@ -1260,29 +1745,435 @@ export default function DoctorDashboardPage({ user, onLogout }) {
 
           {/* ==================== G. CLINICIAN PROFILE ==================== */}
           {activeSection === 'profile' && (
-            <div className="p-6 rounded-2xl bg-white border border-[#DCE7F6] shadow-sm space-y-6 animate-fade-in">
-              <div className="flex items-center gap-4 pb-6 border-b border-slate-200">
-                <div className="w-16 h-16 rounded-full bg-[#0B3B82] text-white text-2xl font-bold flex items-center justify-center">
-                  {doctor.name.charAt(4)}
+            <div className="space-y-6 animate-fade-in">
+              {/* Profile & Photo Editor Card */}
+              <div className="p-6 sm:p-8 rounded-2xl bg-white border border-[#DCE7F6] shadow-sm space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-slate-200">
+                  <div className="flex items-center gap-4">
+                    <div className="relative shrink-0">
+                      <div className="w-20 h-20 rounded-full bg-[#0B3B82] text-white text-2xl font-bold flex items-center justify-center overflow-hidden border-2 border-[#DCE7F6] shadow-xs">
+                        {profileForm.photoUrl ? (
+                          <img src={profileForm.photoUrl} alt={doctor.name} className="h-full w-full object-cover" />
+                        ) : (
+                          avatarLetter
+                        )}
+                      </div>
+                      <label
+                        htmlFor="doctor-profile-photo-input"
+                        title="Change profile photo"
+                        className="absolute -bottom-1 -right-1 grid h-8 w-8 cursor-pointer place-items-center rounded-full bg-[#16A34A] text-white shadow-md ring-2 ring-white hover:bg-[#15803D] transition"
+                      >
+                        <Camera className="h-4 w-4" />
+                      </label>
+                      <input
+                        id="doctor-profile-photo-input"
+                        type="file"
+                        accept="image/png,image/jpeg,image/webp"
+                        onChange={handlePhotoFileChange}
+                        className="sr-only"
+                      />
+                    </div>
+
+                    <div>
+                      <h3 className="text-xl font-extrabold text-[#0B3B82]">{doctor.name}</h3>
+                      <p className="text-xs text-slate-500">
+                        {doctor.specialty}
+                        {doctor.experience ? ` • ${doctor.experience} Experience` : ''}
+                      </p>
+                      {doctor.regNo && (
+                        <span className="inline-flex items-center gap-1 mt-1.5 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
+                          <ShieldCheck className="h-3 w-3" />
+                          {doctor.council ? `${doctor.council} Reg: ` : 'Medical Council Reg: '}
+                          {doctor.regNo}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label
+                      htmlFor="doctor-profile-photo-input"
+                      className="inline-flex cursor-pointer items-center gap-1.5 rounded-xl border border-[#DCE7F6] bg-[#F8FBFF] px-4 py-2 text-xs font-bold text-[#0B3B82] hover:bg-blue-50 transition"
+                    >
+                      <Camera className="h-3.5 w-3.5" />
+                      <span>{profileForm.photoUrl ? 'Change Photo' : 'Upload Photo'}</span>
+                    </label>
+                    {profileForm.photoUrl && (
+                      <button
+                        type="button"
+                        onClick={handleRemovePhoto}
+                        disabled={profileSaving}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-red-50 px-3.5 py-2 text-xs font-bold text-red-600 hover:bg-red-100 transition"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        <span>Remove Photo</span>
+                      </button>
+                    )}
+                  </div>
                 </div>
-                <div>
-                  <h3 className="text-xl font-extrabold text-[#0B3B82]">{doctor.name}</h3>
-                  <p className="text-xs text-slate-500">{doctor.specialty} • {doctor.experience} Experience</p>
-                  <span className="inline-flex items-center gap-1 mt-1 text-[11px] font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200">
-                    <ShieldCheck className="h-3 w-3" /> Tamil Nadu Medical Council Reg: {doctor.regNo}
-                  </span>
-                </div>
+
+                {profileError && (
+                  <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-bold text-red-700 flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    <span>{profileError}</span>
+                  </div>
+                )}
+
+                {profileSavedMsg && (
+                  <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-bold text-[#128D28] flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 shrink-0" />
+                    <span>{profileSavedMsg}</span>
+                  </div>
+                )}
+
+                <form onSubmit={handleSaveProfile} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+                    <div>
+                      <label htmlFor="doc-prof-name" className="block font-bold text-slate-600 uppercase text-[10px] tracking-wider mb-1.5">
+                        Full Name *
+                      </label>
+                      <input
+                        id="doc-prof-name"
+                        type="text"
+                        required
+                        value={profileForm.name}
+                        onChange={(e) => {
+                          setProfileForm((f) => ({ ...f, name: e.target.value }));
+                          if (profileSavedMsg) setProfileSavedMsg('');
+                        }}
+                        placeholder="Dr. Arvind Swaminathan"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-[#DCE7F6] bg-white text-sm font-semibold text-slate-800 focus:outline-none focus:border-[#0B3B82]"
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="doc-prof-specialty" className="block font-bold text-slate-600 uppercase text-[10px] tracking-wider mb-1.5">
+                        Primary Specialty
+                      </label>
+                      <input
+                        id="doc-prof-specialty"
+                        type="text"
+                        value={profileForm.specialty}
+                        onChange={(e) => setProfileForm((f) => ({ ...f, specialty: e.target.value }))}
+                        placeholder="Clinical Sexologist & Andrologist"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-[#DCE7F6] bg-white text-sm font-semibold text-slate-800 focus:outline-none focus:border-[#0B3B82]"
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="doc-prof-qual" className="block font-bold text-slate-600 uppercase text-[10px] tracking-wider mb-1.5">
+                        Qualifications &amp; Degrees
+                      </label>
+                      <input
+                        id="doc-prof-qual"
+                        type="text"
+                        value={profileForm.qualifications}
+                        onChange={(e) => setProfileForm((f) => ({ ...f, qualifications: e.target.value }))}
+                        placeholder="e.g. MBBS, MD, FECSM"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-[#DCE7F6] bg-white text-sm font-semibold text-slate-800 focus:outline-none focus:border-[#0B3B82]"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label htmlFor="doc-prof-exp" className="block font-bold text-slate-600 uppercase text-[10px] tracking-wider mb-1.5">
+                          Experience
+                        </label>
+                        <input
+                          id="doc-prof-exp"
+                          type="text"
+                          value={profileForm.experience}
+                          onChange={(e) => setProfileForm((f) => ({ ...f, experience: e.target.value }))}
+                          placeholder="e.g. 12 Years"
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-[#DCE7F6] bg-white text-sm font-semibold text-slate-800 focus:outline-none focus:border-[#0B3B82]"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="doc-prof-fee" className="block font-bold text-slate-600 uppercase text-[10px] tracking-wider mb-1.5">
+                          Online Fee (₹)
+                        </label>
+                        <input
+                          id="doc-prof-fee"
+                          type="number"
+                          min="100"
+                          max="10000"
+                          value={profileForm.videoFee}
+                          onChange={(e) => setProfileForm((f) => ({ ...f, videoFee: e.target.value }))}
+                          placeholder="599"
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-[#DCE7F6] bg-white text-sm font-semibold text-slate-800 focus:outline-none focus:border-[#0B3B82]"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label htmlFor="doc-prof-clinic" className="block font-bold text-slate-600 uppercase text-[10px] tracking-wider mb-1.5">
+                        Practice Location / Clinic
+                      </label>
+                      <input
+                        id="doc-prof-clinic"
+                        type="text"
+                        value={profileForm.clinic}
+                        onChange={(e) => setProfileForm((f) => ({ ...f, clinic: e.target.value }))}
+                        placeholder="Clinic or practice name"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-[#DCE7F6] bg-white text-sm font-semibold text-slate-800 focus:outline-none focus:border-[#0B3B82]"
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label htmlFor="doc-prof-city" className="block font-bold text-slate-600 uppercase text-[10px] tracking-wider mb-1.5">
+                          City
+                        </label>
+                        <input
+                          id="doc-prof-city"
+                          type="text"
+                          value={profileForm.city}
+                          onChange={(e) => setProfileForm((f) => ({ ...f, city: e.target.value }))}
+                          placeholder="Chennai"
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-[#DCE7F6] bg-white text-sm font-semibold text-slate-800 focus:outline-none focus:border-[#0B3B82]"
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor="doc-prof-langs" className="block font-bold text-slate-600 uppercase text-[10px] tracking-wider mb-1.5">
+                          Languages
+                        </label>
+                        <input
+                          id="doc-prof-langs"
+                          type="text"
+                          value={profileForm.languages}
+                          onChange={(e) => setProfileForm((f) => ({ ...f, languages: e.target.value }))}
+                          placeholder="Tamil, English"
+                          className="w-full px-3.5 py-2.5 rounded-xl border border-[#DCE7F6] bg-white text-sm font-semibold text-slate-800 focus:outline-none focus:border-[#0B3B82]"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label htmlFor="doc-prof-council" className="block font-bold text-slate-600 uppercase text-[10px] tracking-wider mb-1.5">
+                        Medical Council
+                      </label>
+                      <input
+                        id="doc-prof-council"
+                        type="text"
+                        value={profileForm.council}
+                        onChange={(e) => setProfileForm((f) => ({ ...f, council: e.target.value }))}
+                        placeholder="Tamil Nadu Medical Council"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-[#DCE7F6] bg-white text-sm font-semibold text-slate-800 focus:outline-none focus:border-[#0B3B82]"
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="doc-prof-regno" className="block font-bold text-slate-600 uppercase text-[10px] tracking-wider mb-1.5">
+                        Council Registration No.
+                      </label>
+                      <input
+                        id="doc-prof-regno"
+                        type="text"
+                        value={profileForm.regNo}
+                        onChange={(e) => setProfileForm((f) => ({ ...f, regNo: e.target.value }))}
+                        placeholder="TN-MED-44819"
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-[#DCE7F6] bg-white text-sm font-semibold text-slate-800 focus:outline-none focus:border-[#0B3B82]"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block font-bold text-slate-600 uppercase text-[10px] tracking-wider mb-1.5">
+                        Encrypted Doctor Mail
+                      </label>
+                      <div className="px-3.5 py-2.5 rounded-xl border border-slate-200 bg-slate-50 text-sm font-bold text-slate-700 flex items-center justify-between gap-2">
+                        <span className="truncate">{doctor.email || 'Not set'}</span>
+                        <span className="text-[10px] uppercase tracking-wider font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 shrink-0">
+                          Verified Login
+                        </span>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label htmlFor="doc-prof-phone" className="block font-bold text-slate-600 uppercase text-[10px] tracking-wider mb-1.5">
+                        Contact Phone (Optional)
+                      </label>
+                      <input
+                        id="doc-prof-phone"
+                        type="tel"
+                        value={profileForm.phone}
+                        onChange={(e) => setProfileForm((f) => ({ ...f, phone: e.target.value }))}
+                        placeholder="+91 98..."
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-[#DCE7F6] bg-white text-sm font-semibold text-slate-800 focus:outline-none focus:border-[#0B3B82]"
+                      />
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label htmlFor="doc-prof-about" className="block font-bold text-slate-600 uppercase text-[10px] tracking-wider mb-1.5">
+                        Clinical Bio &amp; Approach
+                      </label>
+                      <textarea
+                        id="doc-prof-about"
+                        rows="3"
+                        value={profileForm.about}
+                        onChange={(e) => setProfileForm((f) => ({ ...f, about: e.target.value }))}
+                        placeholder="Describe your clinical specialization and patient care approach..."
+                        className="w-full px-3.5 py-2.5 rounded-xl border border-[#DCE7F6] bg-white text-sm font-medium text-slate-800 focus:outline-none focus:border-[#0B3B82] resize-none"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-end gap-3 pt-2 border-t border-slate-100">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProfileForm(buildProfileFormState(doctor));
+                        setProfileError('');
+                        setProfileSavedMsg('');
+                      }}
+                      className="px-4 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-xs font-bold text-slate-600 transition"
+                    >
+                      Reset
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={profileSaving}
+                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#0B3B82] hover:bg-[#082B5E] text-white text-xs font-bold shadow-xs transition disabled:opacity-60"
+                    >
+                      <Save className="h-4 w-4" />
+                      <span>{profileSaving ? 'Saving Changes...' : 'Save Profile Changes'}</span>
+                    </button>
+                  </div>
+                </form>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
-                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
-                  <p className="font-bold text-slate-400 uppercase text-[10px] tracking-wider">Practice Location</p>
-                  <p className="font-extrabold text-slate-800 mt-1">{doctor.clinic}</p>
+              {/* Password & Account Security Card */}
+              <div className="p-6 sm:p-8 rounded-2xl bg-white border border-[#DCE7F6] shadow-sm space-y-5">
+                <div className="flex items-start justify-between gap-3 pb-4 border-b border-slate-200">
+                  <div className="flex items-center gap-2.5">
+                    <div className="grid h-10 w-10 place-items-center rounded-xl bg-blue-50 text-[#0B3B82]">
+                      <KeyRound className="h-5 w-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-extrabold text-[#0B3B82]">Change Password &amp; Security</h3>
+                      <p className="text-xs text-slate-500">
+                        Update your clinician sign-in password (minimum 6 characters).
+                      </p>
+                    </div>
+                  </div>
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-[11px] font-bold text-[#128D28]">
+                    <Lock className="h-3 w-3" /> Encrypted Auth
+                  </span>
                 </div>
-                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
-                  <p className="font-bold text-slate-400 uppercase text-[10px] tracking-wider">Encrypted Doctor Mail</p>
-                  <p className="font-extrabold text-slate-800 mt-1">{doctor.email}</p>
-                </div>
+
+                {passwordError && (
+                  <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-xs font-bold text-red-700 flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 shrink-0" />
+                    <span>{passwordError}</span>
+                  </div>
+                )}
+
+                {passwordSuccess && (
+                  <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-bold text-[#128D28] flex items-center gap-2">
+                    <CheckCircle2 className="h-4 w-4 shrink-0" />
+                    <span>{passwordSuccess}</span>
+                  </div>
+                )}
+
+                <form onSubmit={handleUpdatePassword} className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div>
+                      <label htmlFor="doc-curr-pw" className="block font-bold text-slate-600 uppercase text-[10px] tracking-wider mb-1.5">
+                        Current Password{hasRegisteredPassword ? ' *' : ' (if set)'}
+                      </label>
+                      <div className="relative">
+                        <input
+                          id="doc-curr-pw"
+                          type={showCurrentPassword ? 'text' : 'password'}
+                          value={currentPasswordInput}
+                          onChange={(e) => {
+                            setCurrentPasswordInput(e.target.value);
+                            if (passwordError) setPasswordError('');
+                          }}
+                          required={hasRegisteredPassword}
+                          placeholder={hasRegisteredPassword ? 'Enter current password' : 'Optional if first setup'}
+                          className="w-full pl-3.5 pr-10 py-2.5 rounded-xl border border-[#DCE7F6] bg-white text-sm font-semibold text-slate-800 focus:outline-none focus:border-[#0B3B82]"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowCurrentPassword((v) => !v)}
+                          aria-label={showCurrentPassword ? 'Hide current password' : 'Show current password'}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                        >
+                          {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label htmlFor="doc-new-pw" className="block font-bold text-slate-600 uppercase text-[10px] tracking-wider mb-1.5">
+                        New Password *
+                      </label>
+                      <div className="relative">
+                        <input
+                          id="doc-new-pw"
+                          type={showNewPassword ? 'text' : 'password'}
+                          required
+                          minLength={6}
+                          value={newPasswordInput}
+                          onChange={(e) => {
+                            setNewPasswordInput(e.target.value);
+                            if (passwordError) setPasswordError('');
+                          }}
+                          placeholder="Minimum 6 characters"
+                          className="w-full pl-3.5 pr-10 py-2.5 rounded-xl border border-[#DCE7F6] bg-white text-sm font-semibold text-slate-800 focus:outline-none focus:border-[#0B3B82]"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowNewPassword((v) => !v)}
+                          aria-label={showNewPassword ? 'Hide new password' : 'Show new password'}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                        >
+                          {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    <div>
+                      <label htmlFor="doc-confirm-pw" className="block font-bold text-slate-600 uppercase text-[10px] tracking-wider mb-1.5">
+                        Confirm New Password *
+                      </label>
+                      <div className="relative">
+                        <input
+                          id="doc-confirm-pw"
+                          type={showConfirmPassword ? 'text' : 'password'}
+                          required
+                          minLength={6}
+                          value={confirmPasswordInput}
+                          onChange={(e) => {
+                            setConfirmPasswordInput(e.target.value);
+                            if (passwordError) setPasswordError('');
+                          }}
+                          placeholder="Re-enter new password"
+                          className="w-full pl-3.5 pr-10 py-2.5 rounded-xl border border-[#DCE7F6] bg-white text-sm font-semibold text-slate-800 focus:outline-none focus:border-[#0B3B82]"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword((v) => !v)}
+                          aria-label={showConfirmPassword ? 'Hide confirm password' : 'Show confirm password'}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                        >
+                          {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end pt-2 border-t border-slate-100">
+                    <button
+                      type="submit"
+                      disabled={passwordSaving}
+                      className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-[#16A34A] hover:bg-[#15803D] text-white text-xs font-bold shadow-xs transition disabled:opacity-60"
+                    >
+                      <KeyRound className="h-4 w-4" />
+                      <span>{passwordSaving ? 'Updating Password...' : 'Update Password'}</span>
+                    </button>
+                  </div>
+                </form>
               </div>
             </div>
           )}
@@ -1310,30 +2201,43 @@ export default function DoctorDashboardPage({ user, onLogout }) {
 
             <form onSubmit={handleIssueRx} className="mt-4 space-y-4 text-xs">
               <div>
-                <label className="block font-bold text-slate-700 mb-1">Select Patient</label>
-                <select
-                  value={newRxPatient}
-                  onChange={(e) => setNewRxPatient(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border border-slate-300 bg-white font-medium text-slate-800 focus:outline-none"
-                >
-                  <option value="Suresh Kumar">Suresh Kumar (PT-9410)</option>
-                  <option value="Anonymous Patient #812">Anonymous Patient #812 (PT-9418)</option>
-                  <option value="Karthik Raja">Karthik Raja (PT-9422)</option>
-                </select>
+                <label className="block font-bold text-slate-700 mb-1">Patient Name</label>
+                {patientsQueue.length > 0 ? (
+                  <select
+                    value={newRxPatient}
+                    onChange={(e) => setNewRxPatient(e.target.value)}
+                    required
+                    className="w-full p-2.5 rounded-xl border border-slate-300 bg-white font-medium text-slate-800 focus:outline-none"
+                  >
+                    <option value="">Select patient</option>
+                    {patientsQueue.map((patient) => (
+                      <option key={patient.id} value={patient.name}>
+                        {patient.name} ({patient.id})
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    type="text"
+                    required
+                    placeholder="Enter patient name"
+                    value={newRxPatient}
+                    onChange={(e) => setNewRxPatient(e.target.value)}
+                    className="w-full p-2.5 rounded-xl border border-slate-300 font-medium text-slate-800"
+                  />
+                )}
               </div>
 
               <div>
                 <label className="block font-bold text-slate-700 mb-1">Formulation Name</label>
-                <select
+                <input
+                  type="text"
+                  required
+                  placeholder="Enter medication or formulation"
                   value={newRxMedicine}
                   onChange={(e) => setNewRxMedicine(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border border-slate-300 bg-white font-medium text-slate-800 focus:outline-none"
-                >
-                  <option value="Tadalafil Daily Care 5mg">Tadalafil Daily Care 5mg (PDE-5 Vitality)</option>
-                  <option value="Nayacura Pro-Delay Care Spray">Nayacura Pro-Delay Care Spray (Lidocaine Calibration)</option>
-                  <option value="Pure Himalayan Shilajit Gold Grade">Pure Himalayan Shilajit Gold Grade (Testosterone Support)</option>
-                  <option value="Sildenafil Citrate 50mg">Sildenafil Citrate 50mg (On-Demand)</option>
-                </select>
+                  className="w-full p-2.5 rounded-xl border border-slate-300 font-medium text-slate-800"
+                />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -1341,6 +2245,7 @@ export default function DoctorDashboardPage({ user, onLogout }) {
                   <label className="block font-bold text-slate-700 mb-1">Dosage & Frequency</label>
                   <input
                     type="text"
+                    placeholder="e.g. 1 tablet at bedtime"
                     value={newRxDosage}
                     onChange={(e) => setNewRxDosage(e.target.value)}
                     className="w-full p-2.5 rounded-xl border border-slate-300 font-medium text-slate-800"
@@ -1350,6 +2255,7 @@ export default function DoctorDashboardPage({ user, onLogout }) {
                   <label className="block font-bold text-slate-700 mb-1">Duration</label>
                   <input
                     type="text"
+                    placeholder="e.g. 30 Days"
                     value={newRxDuration}
                     onChange={(e) => setNewRxDuration(e.target.value)}
                     className="w-full p-2.5 rounded-xl border border-slate-300 font-medium text-slate-800"
@@ -1361,6 +2267,7 @@ export default function DoctorDashboardPage({ user, onLogout }) {
                 <label className="block font-bold text-slate-700 mb-1">Clinical Instructions & Notes</label>
                 <textarea
                   rows={2}
+                  placeholder="Enter clinical instructions..."
                   value={newRxNotes}
                   onChange={(e) => setNewRxNotes(e.target.value)}
                   className="w-full p-2.5 rounded-xl border border-slate-300 font-medium text-slate-800"
@@ -1369,7 +2276,10 @@ export default function DoctorDashboardPage({ user, onLogout }) {
 
               <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-[11px] flex items-center gap-2">
                 <ShieldCheck className="h-4 w-4 shrink-0 text-[#16A34A]" />
-                <span>Digitally signed via MCI Certificate • Reg: TN-MED-44819. Dispatches in 100% plain box.</span>
+                <span>
+                  Digitally signed via {doctor.council || 'Medical Council'}
+                  {doctor.regNo ? ` • Reg: ${doctor.regNo}` : ''}. Dispatches in 100% plain box.
+                </span>
               </div>
 
               <div className="flex items-center justify-end gap-3 pt-3 border-t border-slate-100">
@@ -1424,36 +2334,29 @@ export default function DoctorDashboardPage({ user, onLogout }) {
                 </div>
                 <div>
                   <span className="text-slate-500 block">Blood Pressure:</span>
-                  <span className="font-extrabold text-emerald-700">{selectedPatientRecord.vitals?.bp || '120/80 mmHg'}</span>
+                  <span className="font-extrabold text-emerald-700">{selectedPatientRecord.vitals?.bp || '—'}</span>
                 </div>
               </div>
 
               <div>
                 <h4 className="font-bold text-slate-700">Clinical History & Presentation:</h4>
                 <p className="p-3 rounded-xl bg-blue-50/50 border border-blue-100 text-slate-700 mt-1">
-                  {selectedPatientRecord.history}
+                  {selectedPatientRecord.history || 'No clinical history recorded yet.'}
                 </p>
               </div>
 
               <div>
                 <h4 className="font-bold text-slate-700">Chief Complaint:</h4>
                 <p className="p-3 rounded-xl bg-emerald-50/50 border border-emerald-100 text-slate-700 mt-1">
-                  {selectedPatientRecord.chiefComplaint}
+                  {selectedPatientRecord.chiefComplaint || '—'}
                 </p>
               </div>
 
               <div>
-                <h4 className="font-bold text-slate-700">NABL Verified Pathology Panel:</h4>
-                <div className="p-3 rounded-xl bg-slate-50 border border-slate-200 space-y-1.5 mt-1">
-                  <div className="flex justify-between font-medium">
-                    <span>7-Panel STI Multiplex:</span>
-                    <span className="font-bold text-emerald-700">NON-REACTIVE (Negative)</span>
-                  </div>
-                  <div className="flex justify-between font-medium">
-                    <span>Total Serum Testosterone:</span>
-                    <span className="font-bold text-[#0B3B82]">624 ng/dL</span>
-                  </div>
-                </div>
+                <h4 className="font-bold text-slate-700">Diagnostic Lab Summary:</h4>
+                <p className="p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 mt-1">
+                  {selectedPatientRecord.labSummary || 'No diagnostic panel attached yet.'}
+                </p>
               </div>
             </div>
 

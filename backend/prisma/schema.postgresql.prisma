@@ -602,3 +602,22 @@ model TestBooking {
   healthTest HealthTest @relation(fields: [healthTestId], references: [id])
   @@index([patientUserId, createdAt])
 }
+
+/// Every patient-facing action (booking, order, consult) recorded for the admin
+/// operations console. Kept separate from clinical tables so the admin view never
+/// reads consultation content.
+model PatientActivity {
+  id          String   @id @default(cuid())
+  type        String
+  reference   String
+  patientName String?
+  phone       String?
+  email       String?
+  summary     String
+  detail      Json?
+  status      String   @default("NEW")
+  createdAt   DateTime @default(now())
+
+  @@index([type, createdAt])
+  @@index([reference])
+}

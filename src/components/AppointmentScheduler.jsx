@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, ArrowRight, CheckCircle2, Globe2, MapPin, ShieldCheck, Sunrise, Sun, Sunset } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle2, Globe2, ShieldCheck, Sunrise, Sun, Sunset, Video } from 'lucide-react';
 import { DOCTORS } from '../data/healthcareData';
 import { BOOKING_SERVICES } from '../data/bookingServices';
 import {
   formatDisplayPhone,
   submitBookingNotification,
 } from '../lib/bookingMessages';
+import { recordBooking } from '../lib/bookingsStore';
 
 const TIME_ZONE = 'Asia/Kolkata';
 const dateLabel = date => date.toLocaleDateString('en-IN', { timeZone: TIME_ZONE, day: 'numeric', month: 'short', year: 'numeric' });
@@ -40,6 +41,8 @@ export default function AppointmentScheduler({ onBookingSuccess, onClose }) {
   });
   const service = BOOKING_SERVICES.find(item => item.id === serviceId);
   const doctor = DOCTORS.find(item => item.id === service.doctorId);
+  const onlineFee = doctor.videoFee || doctor.fee;
+  const modeLabel = 'Online Consultation (Video & Audio)';
   const nowParts = new Intl.DateTimeFormat('en-GB', { timeZone: TIME_ZONE, hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(now);
   const currentMinute = Number(nowParts.find(p => p.type === 'hour').value) * 60 + Number(nowParts.find(p => p.type === 'minute').value);
   const availableForDay = index => {
@@ -74,13 +77,14 @@ export default function AppointmentScheduler({ onBookingSuccess, onClose }) {
           phone: patient.phone,
           doctorName: doctor.name,
           specialty: doctor.specialty,
-          clinicName: doctor.clinicName,
-          clinicAddress: doctor.clinicAddress,
-          mode: 'IN_PERSON',
+          clinicName: 'Nayacura Online Telehealth',
+          clinicAddress: modeLabel,
+          mode: 'ONLINE',
           dateLabel: dayStr,
           slotLabel: selectedSlot,
+          ...(patient.reason.trim() ? { reason: patient.reason.trim() } : {}),
           timezone: TIME_ZONE,
-          feeRupees: doctor.fee,
+          feeRupees: onlineFee,
           channels: ['SMS', 'WHATSAPP'],
           consent: true,
         });
@@ -97,16 +101,20 @@ export default function AppointmentScheduler({ onBookingSuccess, onClose }) {
     const finalId = reference || fallbackId;
     const newBooking = {
       id: finalId,
+      reference: finalId,
       doctorName: doctor.name, doctorSpecialty: doctor.specialty, doctorPhoto: doctor.photo,
       serviceId: service.id, serviceName: service.name,
-      clinicName: doctor.clinicName, clinicAddress: doctor.clinicAddress,
+      clinicName: 'Nayacura Online Telehealth', clinicAddress: modeLabel,
       day: dayStr, timeSlot: selectedSlot, timeZone: TIME_ZONE,
+      dateLabel: dayStr, slotLabel: selectedSlot,
+      when: `${dayStr}, ${selectedSlot} (30 min)`,
       patientName: patient.name.trim(), patientPhone: serverPhone || patient.phone, reason: patient.reason.trim(),
-      fee: doctor.fee, type: 'clinic', status: 'Confirmed',
+      fee: onlineFee, feeRupees: onlineFee, type: 'online', status: 'Confirmed',
     };
     setDelivery({
       phone: serverPhone || formatDisplayPhone(patient.phone),
     });
+    recordBooking(newBooking);
     onBookingSuccess(newBooking);
     setBooking(newBooking);
     setSending(false);
@@ -118,19 +126,18 @@ export default function AppointmentScheduler({ onBookingSuccess, onClose }) {
       <div className="mx-auto grid min-h-[650px] max-w-[1440px] lg:grid-cols-[minmax(260px,0.85fr)_minmax(0,1.55fr)]">
         <aside className={`${step === 'schedule' ? 'flex' : 'hidden lg:flex'} min-w-0 flex-col border-b border-slate-200 bg-white px-4 py-5 sm:px-10 sm:py-9 lg:border-b-0 lg:border-r lg:py-12`}>
           <ShieldCheck className="mb-7 hidden sm:block h-12 w-12 fill-blue-100 text-[#1686E8]" aria-hidden="true" />
-          <h1 className="text-2xl sm:text-4xl font-bold tracking-tight">Book Appointment</h1>
-          <p className="mt-6 hidden sm:block max-w-sm text-lg leading-relaxed text-slate-500">Choose a convenient time for your private consultation with a Nayacura specialist.</p>
+          <h1 className="text-2xl sm:text-4xl font-bold tracking-tight">Book Online Consult</h1>
+          <p className="mt-6 hidden sm:block max-w-sm text-lg leading-relaxed text-slate-500">One private online booking — talk via Video or Audio anytime during your session.</p>
           <label className="mt-4 sm:mt-8 text-sm font-medium text-slate-500">
             Services
             <select aria-label="Choose a sexual wellness service" value={serviceId} disabled={step === 'success'} onChange={e => { setServiceId(e.target.value); setSelectedSlot(''); setDayIndex(0); setStep('schedule'); }} className={inputClass}>
               {BOOKING_SERVICES.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
             </select>
           </label>
-          <p className="mt-3 text-sm font-medium text-brand-navy">{doctor.name}</p>
+          <p className="mt-4 text-sm font-medium text-brand-navy">{doctor.name}</p>
           <p className="mt-1 text-sm text-slate-500">{doctor.specialty}</p>
-          <p className="mt-5 hidden sm:flex items-start gap-2 text-sm leading-relaxed text-slate-500"><MapPin className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />{doctor.clinicName}, {doctor.city}</p>
-          <details className="mt-3 text-sm text-slate-500 sm:hidden"><summary className="cursor-pointer py-2 font-medium text-brand-navy">View clinic details</summary><p className="mt-1">{doctor.clinicName}</p><p>{doctor.clinicAddress}</p></details>
-          <p className="mt-4 font-semibold text-brand-navy">₹{doctor.fee} <span className="text-sm font-normal text-slate-500">· Pay at clinic</span></p>
+          <p className="mt-5 flex items-start gap-2 text-sm leading-relaxed text-slate-500"><Video className="mt-0.5 h-4 w-4 shrink-0 text-brand-green" aria-hidden="true" />100% Online · Video or Audio during call</p>
+          <p className="mt-4 font-semibold text-brand-navy">₹{onlineFee} <span className="text-sm font-normal text-slate-500">· Online Session</span></p>
           <div className="hidden lg:block mt-8 pt-6 lg:mt-auto">
             {step === 'details' ? <button type="button" onClick={() => setStep('schedule')} className={`inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-[#1686E8] ${focusClass}`}><ArrowLeft className="h-4 w-4" /> Back</button>
               : <button type="button" onClick={onClose} className={`inline-flex items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-[#1686E8] ${focusClass}`}><ArrowLeft className="h-4 w-4" /> Back</button>}
@@ -180,7 +187,7 @@ export default function AppointmentScheduler({ onBookingSuccess, onClose }) {
               <input type="checkbox" checked={smsConsent} onChange={e => setSmsConsent(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 rounded border-slate-300 text-brand-green" />
               <span>Send my booking confirmation to this mobile number via SMS and WhatsApp (no clinical details shared).</span>
             </label>
-            <p className="text-sm text-slate-500">Consultation fee: ₹{doctor.fee}. Pay at the clinic.</p>
+            <p className="text-sm text-slate-500">Consultation fee: ₹{onlineFee} · Online {modeLabel}.</p>
             <button type="submit" disabled={sending} className={`inline-flex min-h-12 w-full items-center justify-center gap-3 rounded-xl bg-brand-navy px-5 py-3 font-semibold text-white hover:bg-brand-navy-dark disabled:opacity-60 ${focusClass}`}>{sending ? 'Confirming & sending...' : 'Confirm Appointment'} <ArrowRight className="h-5 w-5" /></button>
           </form>}
 
@@ -192,7 +199,7 @@ export default function AppointmentScheduler({ onBookingSuccess, onClose }) {
                   Booking for <strong>{formatDisplayPhone(delivery?.phone || booking.patientPhone)}</strong> saved in My Bookings.
                 </p>
                 <dl className="space-y-4 rounded-2xl border border-slate-200 bg-white p-6">
-                  {Object.entries({ 'Booking reference': booking.id, Service: booking.serviceName, Specialist: booking.doctorName, Patient: booking.patientName, 'Date & time': `${booking.day} · ${booking.timeSlot}`, 'Time zone': TIME_ZONE, Clinic: booking.clinicAddress, Fee: `₹${booking.fee} · Pay at clinic` }).map(([label, value]) => <div key={label}><dt className="text-xs text-slate-400">{label}</dt><dd className="mt-1 text-sm font-medium">{value}</dd></div>)}
+                  {Object.entries({ 'Booking reference': booking.id, Service: booking.serviceName, Specialist: booking.doctorName, Patient: booking.patientName, 'Date & time': `${booking.day} · ${booking.timeSlot}`, 'Time zone': TIME_ZONE, Mode: modeLabel, Fee: `₹${booking.fee} · Online Consult` }).map(([label, value]) => <div key={label}><dt className="text-xs text-slate-400">{label}</dt><dd className="mt-1 text-sm font-medium">{value}</dd></div>)}
                 </dl>
                 <button type="button" onClick={onClose} className={`inline-flex rounded-xl bg-brand-navy px-5 py-3 font-semibold text-white ${focusClass}`}>Done & Close</button>
               </div>

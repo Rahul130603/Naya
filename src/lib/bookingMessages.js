@@ -56,16 +56,14 @@ export function buildBookingMessagePreviews({
   doctorName,
   specialty,
   when,
-  mode = 'IN_PERSON',
-  clinicName,
-  clinicAddress,
+  mode = 'ONLINE',
   feeRupees,
   supportEmail = 'support@nayacura.com',
 }) {
   const firstName = String(patientName || '').trim().split(/\s+/)[0] || 'Patient';
-  const modeLabel = mode === 'ONLINE' ? 'Encrypted Video Consultation' : 'In-Clinic Consultation';
+  const modeLabel = 'Online Consultation (Video & Audio)';
   const feeText = typeof feeRupees === 'number' && Number.isFinite(feeRupees)
-    ? `Rs.${feeRupees.toLocaleString('en-IN')} (${mode === 'ONLINE' ? 'Online' : 'Pay at Clinic'})`
+    ? `Rs.${feeRupees.toLocaleString('en-IN')} (Online)`
     : null;
 
   const smsLines = [
@@ -74,7 +72,7 @@ export function buildBookingMessagePreviews({
     `Patient: ${firstName}`,
     `Doctor: ${doctorName}${specialty ? ` (${specialty})` : ''}`,
     `When: ${when}`,
-    `Mode: ${modeLabel}${clinicName && mode !== 'ONLINE' ? ` - ${clinicName}` : ''}`,
+    `Mode: ${modeLabel}`,
   ];
   if (feeText) smsLines.push(`Fee: ${feeText}`);
   smsLines.push(`100% Confidential. Help: ${supportEmail}`);
@@ -84,22 +82,18 @@ export function buildBookingMessagePreviews({
     '',
     `Hello ${firstName},`,
     '',
-    'Your confidential consultation has been scheduled. Booking summary:',
+    'Your confidential online consultation has been scheduled. Booking summary:',
     '',
     `*Booking Ref:* ${reference}`,
     `*Doctor:* ${doctorName}${specialty ? ` (${specialty})` : ''}`,
     `*Date & Time:* ${when}`,
     `*Mode:* ${modeLabel}`,
+    '*Join Link:* Open My Bookings in your Nayacura Patient Dashboard',
   ];
-  if (mode !== 'ONLINE' && clinicName) waLines.push(`*Clinic:* ${clinicName}`);
-  if (mode !== 'ONLINE' && clinicAddress) waLines.push(`*Address:* ${clinicAddress}`);
-  if (mode === 'ONLINE') waLines.push('*Join Link:* Open My Bookings in your Nayacura Patient Dashboard');
   if (feeText) waLines.push(`*Consultation Fee:* ${feeText}`);
   waLines.push(
     '',
-    mode === 'ONLINE'
-      ? 'Please join 5 minutes early from a private space (audio/camera-off mode supported).'
-      : 'Please arrive 10 minutes early at the clinic desk.',
+    'Please join 5 minutes early from a private space (audio/camera-off mode supported).',
     '',
     'For privacy, no clinical details are ever sent over SMS or WhatsApp.',
     `Need assistance or rescheduling? Write to ${supportEmail}`,

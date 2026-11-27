@@ -83,6 +83,30 @@ type AdminUser = {
   doctorStatus: string | null;
 };
 
+type AdminActivity = {
+  id: string;
+  type: string;
+  reference: string;
+  patientName: string | null;
+  phone: string | null;
+  email: string | null;
+  summary: string;
+  detail: unknown;
+  status: string;
+  createdAt: string;
+};
+
+const ACTIVITY_LABELS: Record<string, string> = {
+  BOOKING_REQUEST: 'Appointment',
+  STORE_ORDER: 'Store order',
+  VIDEO_CONSULT: 'Consult request',
+  PRESCRIPTION: 'Prescription',
+};
+
+function activityLabel(type: string) {
+  return ACTIVITY_LABELS[type] || type;
+}
+
 type AdminAppointment = {
   id: string;
   bookingId: string;
@@ -238,6 +262,11 @@ export default function AdminDashboard() {
     queryKey: ['admin-appointments'],
     queryFn: () => api<{ appointments: AdminAppointment[] }>('/admin/appointments'),
     enabled: ['overview', 'appointments'].includes(section),
+  });
+  const activityQuery = useQuery({
+    queryKey: ['admin-activity'],
+    queryFn: () => api<{ items: AdminActivity[] }>('/admin/activity'),
+    enabled: ['overview', 'activity'].includes(section),
   });
   const paymentsQuery = useQuery({
     queryKey: ['admin-payments'],
@@ -439,6 +468,7 @@ export default function AdminDashboard() {
     { key: 'doctors', label: 'Doctor onboarding', icon: Stethoscope, badge: overview?.pendingDoctors },
     { key: 'users', label: 'Accounts', icon: Users },
     { key: 'appointments', label: 'Appointments', icon: CalendarDays },
+    { key: 'activity', label: 'Patient activity', icon: Activity, badge: activityQuery.data?.items.length },
     { key: 'payments', label: 'Payments & refunds', icon: CircleDollarSign },
     { key: 'content', label: 'Content', icon: BookOpen },
     { key: 'reviews', label: 'Review moderation', icon: Star },
@@ -453,6 +483,7 @@ export default function AdminDashboard() {
     doctors: 'Doctor onboarding',
     users: 'Account administration',
     appointments: 'Appointment operations',
+    activity: 'Patient activity',
     payments: 'Payments & refunds',
     content: 'Content management',
     reviews: 'Review moderation',
@@ -682,6 +713,43 @@ export default function AdminDashboard() {
                 </div>
               ))}
             </div>
+          </TableShell>
+        ) : section === 'activity' ? (
+          <TableShell
+            title="Patient activity"
+            description="Bookings, store orders and consult requests raised from the website"
+          >
+            {activityQuery.data?.items.length ? (
+              <div className="divide-y divide-white/[0.06]">
+                {activityQuery.data.items.map((item) => (
+                  <div key={item.id} className="flex flex-wrap items-start justify-between gap-3 px-5 py-4">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Badge
+                          tone={
+                            item.type === 'STORE_ORDER'
+                              ? 'lavender'
+                              : item.type === 'VIDEO_CONSULT'
+                                ? 'rose'
+                                : 'muted'
+                          }
+                        >
+                          {activityLabel(item.type)}
+                        </Badge>
+                        <span className="font-mono text-[9px] text-mauve">{item.reference}</span>
+                      </div>
+                      <p className="mt-1.5 font-sans text-[10.5px] text-ivory">{item.summary}</p>
+                      <p className="mt-0.5 font-body text-[8.5px] text-mauve">
+                        {item.patientName || 'Guest patient'}
+                        {item.phone ? ` · ${item.phone}` : ''} · {formatDateTime(item.createdAt)}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="px-5 py-6 font-body text-[10px] text-mauve">No patient activity yet.</p>
+            )}
           </TableShell>
         ) : section === 'payments' ? (
           <div className="space-y-3">

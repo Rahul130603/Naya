@@ -14,9 +14,8 @@ import { postDoctorAnswer } from '../lib/communityQa';
 
 const RECOMMENDATIONS = [
   'General Self-Care Guidance',
-  'Video Consultation Recommended',
+  'Online Consultation Recommended',
   'At-Home Hormone / STI Test',
-  'In-Clinic Evaluation',
 ];
 
 function formatDate(iso) {
@@ -224,7 +223,7 @@ export default function DoctorQaSection({ threads, doctor, onNotify }) {
                         required
                         value={answerText}
                         onChange={(e) => setAnswerText(e.target.value)}
-                        placeholder="Provide clear, non-judgmental medical guidance and explain when an in-person or video consult is needed…"
+                        placeholder="Provide clear, non-judgmental medical guidance and explain when an online video or audio consult is needed…"
                         className="w-full rounded-xl border border-slate-200 bg-white p-3 text-sm text-slate-800 focus:outline-none focus:ring-2 focus:ring-[#16A34A]"
                       />
                     </div>

@@ -27,6 +27,9 @@ export const loginSchema = z.object({
   email,
   password: z.string().min(1, 'Please enter your password.').max(128),
   role: z.enum(['PATIENT', 'DOCTOR', 'ADMIN']).optional(),
+  // Development only: lets the demo admin console obtain a session without an
+  // authenticator app. Ignored entirely in production.
+  skipMfa: z.boolean().optional(),
 });
 
 export const doctorApplicationSchema = z.object({
@@ -152,6 +155,10 @@ export const bookingRequestSchema = z.object({
   slotLabel: z.string().trim().max(40).optional(),
   timezone: z.string().trim().max(60).default('Asia/Kolkata'),
   feeRupees: z.number().int().min(0).max(500000).optional(),
+  durationMinutes: z.union([z.literal(30), z.literal(60)]).default(30),
+  age: z.string().trim().max(10).optional(),
+  gender: z.string().trim().max(24).optional(),
+  reason: z.string().trim().max(500).optional(),
   channels: z.array(z.enum(['SMS', 'WHATSAPP'])).min(1).max(2).default(['SMS', 'WHATSAPP']),
   consent: z.literal(true, {
     errorMap: () => ({ message: 'Please agree to receive booking updates on SMS and WhatsApp.' }),

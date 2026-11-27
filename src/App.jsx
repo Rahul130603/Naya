@@ -109,7 +109,7 @@ function WebsiteApp() {
 
   // Modal Triggers
   const [bookingModalDoctor, setBookingModalDoctor] = useState(null);
-  const [bookingConsultType, setBookingConsultType] = useState('clinic');
+  const [bookingConsultType, setBookingConsultType] = useState('online');
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
 
@@ -121,9 +121,9 @@ function WebsiteApp() {
   const [isDoctorOnboardingOpen, setIsDoctorOnboardingOpen] = useState(false);
 
   // Handlers
-  const handleBookAppointment = (doctor, type = 'clinic') => {
+  const handleBookAppointment = (doctor, type = 'online') => {
     setBookingModalDoctor(doctor);
-    setBookingConsultType(type);
+    setBookingConsultType(type || 'online');
     setIsBookingModalOpen(true);
   };
 
@@ -342,6 +342,7 @@ function WebsiteApp() {
               <DoctorDashboardPage 
                 user={user}
                 onLogout={handleLogout}
+                onUpdateUser={handleLoginSuccess}
                 onStartVideoConsult={handleStartVideoConsult}
               />
             } 
@@ -352,6 +353,7 @@ function WebsiteApp() {
               <DoctorDashboardPage 
                 user={user}
                 onLogout={handleLogout}
+                onUpdateUser={handleLoginSuccess}
                 onStartVideoConsult={handleStartVideoConsult}
               />
             } 

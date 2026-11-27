@@ -443,10 +443,10 @@ export default function PatientDashboardPage({
                 )}</div>
                   {nextConsultation ? <>
                     <div className="flex flex-wrap items-center justify-between gap-4 py-4">
-                      <div className="flex items-center gap-3"><span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-blue-50 font-extrabold text-[#0B3B82]">{nextConsultation.doctorName?.charAt(0) || 'D'}</span><div><p className="font-bold text-[#14213D]">{nextConsultation.doctorName}</p><p className="text-xs text-[#526987]">{nextConsultation.doctorSpecialty}</p><p className="mt-1 text-xs text-[#0B3B82]">{nextConsultation.clinicName}</p></div></div>
+                      <div className="flex items-center gap-3"><span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-blue-50 font-extrabold text-[#0B3B82]">{nextConsultation.doctorName?.charAt(0) || 'D'}</span><div><p className="font-bold text-[#14213D]">{nextConsultation.doctorName}</p><p className="text-xs text-[#526987]">{nextConsultation.doctorSpecialty}</p><p className="mt-1 text-xs text-[#0B3B82]">100% Private Online Room</p></div></div>
                       <div className="text-sm font-semibold text-[#31466A]"><p>{nextConsultation.dateObj ? formatDayLabel(nextConsultation.dateObj) : nextConsultation.day}</p><p className="mt-1">{nextConsultation.timeSlot}</p></div>
                     </div>
-                    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#E1E7EF] pt-3"><span className="text-xs text-[#526987]">{nextConsultation.type === 'video' ? 'Video consultation' : 'In-clinic consultation'}</span><div className="flex flex-wrap gap-2">{nextConsultation.type === 'video' && <button type="button" onClick={() => setCallAppointment(nextConsultation)} className="rounded-lg bg-[#0B3B82] px-3 py-2 text-xs font-bold text-white">Join Video Call</button>}<Link to={dashboardPath('appointments')} className="rounded-lg border border-[#9AB5DF] px-3 py-2 text-xs font-bold text-[#0B3B82]">Manage Visit →</Link></div></div>
+                    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#E1E7EF] pt-3"><span className="text-xs text-[#526987]">Online consultation (Video &amp; Audio)</span><div className="flex flex-wrap gap-2"><button type="button" onClick={() => setCallAppointment(nextConsultation)} className="rounded-lg bg-[#0B3B82] px-3 py-2 text-xs font-bold text-white">Join Online Call</button><Link to={dashboardPath('appointments')} className="rounded-lg border border-[#9AB5DF] px-3 py-2 text-xs font-bold text-[#0B3B82]">Manage Visit →</Link></div></div>
                   </> : <p className="py-5 text-sm text-[#526987]">No appointments yet.</p>}
                 </section>
 
@@ -509,12 +509,10 @@ export default function PatientDashboardPage({
                             </div>
                           </div>
                           <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-[#E1E7EF] pt-3">
-                            <span className="inline-flex items-center gap-1 text-xs text-[#526987]"><MapPin className="h-3.5 w-3.5" />{appointment.type === 'video' ? 'Secure video room' : appointment.clinicName || appointment.clinicAddress}</span>
-                            {appointment.type === 'video' ? (
-                              <button type="button" onClick={() => setCallAppointment(appointment)} className="rounded-lg bg-[#0B3B82] px-3 py-2 text-xs font-bold text-white">Join Video Call</button>
-                            ) : (
-                              <span className="rounded-lg bg-blue-50 px-3 py-2 text-xs font-bold text-[#0B3B82]">In-clinic visit</span>
-                            )}
+                            <span className="inline-flex items-center gap-1 text-xs text-[#526987]"><MapPin className="h-3.5 w-3.5" />Online room (Video &amp; Audio)</span>
+                            <button type="button" onClick={() => setCallAppointment(appointment)} className="rounded-lg bg-[#0B3B82] px-3 py-2 text-xs font-bold text-white">
+                              Join Online Call
+                            </button>
                           </div>
                         </article>
                       ))}
@@ -532,7 +530,7 @@ export default function PatientDashboardPage({
               <section className="rounded-2xl border border-[#DCE7F6] bg-white p-5 shadow-sm">
                 <div className="flex items-center justify-between gap-2 border-b border-[#E1E7EF] pb-3">
                   <h3 className="text-base font-extrabold text-[#0B3B82]">All Consultations ({consultations.length})</h3>
-                  <Link to={dashboardPath('video')} className="text-xs font-bold text-[#0B3B82] hover:underline">Video visits →</Link>
+                  <Link to={dashboardPath('video')} className="text-xs font-bold text-[#0B3B82] hover:underline">Online call room →</Link>
                 </div>
                 {consultations.length ? (
                   <div className="mt-4 grid gap-3">
@@ -540,18 +538,16 @@ export default function PatientDashboardPage({
                       <div key={appointment.id} className="flex flex-col gap-3 rounded-xl border border-[#E1E7EF] p-4 text-xs sm:flex-row sm:items-center sm:justify-between">
                         <div>
                           <p className="text-sm font-bold text-[#0B3B82]">{appointment.doctorName}</p>
-                          <p className="mt-0.5 text-[#526987]">{appointment.doctorSpecialty} • {appointment.clinicName || appointment.clinicAddress}</p>
+                          <p className="mt-0.5 text-[#526987]">{appointment.doctorSpecialty} • Online Consultation (Video &amp; Audio)</p>
                           <p className="mt-1 font-semibold text-[#31466A]">
                             {formatShortDate(appointment.dateObj) || appointment.day} at {appointment.timeSlot}
                           </p>
                         </div>
                         <div className="flex flex-wrap items-center gap-2">
                           <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${statusTone(appointmentStatus(appointment))}`}>{appointmentStatus(appointment)}</span>
-                          {appointment.type === 'video' ? (
-                            <button type="button" onClick={() => setCallAppointment(appointment)} className="rounded-lg bg-[#0B3B82] px-3 py-1.5 text-[11px] font-bold text-white">Join Video Call</button>
-                          ) : (
-                            <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-[11px] font-bold text-[#15803D]">In-Clinic</span>
-                          )}
+                          <button type="button" onClick={() => setCallAppointment(appointment)} className="rounded-lg bg-[#0B3B82] px-3 py-1.5 text-[11px] font-bold text-white">
+                            Join Online Call
+                          </button>
                         </div>
                       </div>
                     ))}
@@ -781,7 +777,7 @@ export default function PatientDashboardPage({
                 </div>
                 <div className="col-span-2 rounded-2xl border border-[#DCE7F6] bg-white p-5 shadow-sm lg:col-span-1">
                   <p className="text-xs font-extrabold uppercase tracking-wide text-[#526987]">Payment mode</p>
-                  <p className="mt-1 text-sm font-bold text-[#14213D]">Pay at clinic / secure online link</p>
+                  <p className="mt-1 text-sm font-bold text-[#14213D]">100% Online (Video &amp; Audio)</p>
                 </div>
               </div>
               <section className="overflow-hidden rounded-2xl border border-[#DCE7F6] bg-white shadow-sm">

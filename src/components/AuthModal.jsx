@@ -3,10 +3,14 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Mail, Lock, User, ArrowRight, ShieldCheck, CheckCircle2, Stethoscope } from 'lucide-react';
 import Modal from './ui/Modal';
 import {
+  EMAIL_ALREADY_USED_MESSAGE,
   HELLO_EMAIL,
+  checkEmailAvailability,
   dispatchWelcomeEmail,
   findPatientByEmail,
   registerPatient,
+  rollbackLocalRegistration,
+  syncPatientToServer,
 } from '../lib/doctorRegistry';
 
 export default function AuthModal({ isOpen, onClose, onLoginSuccess }) {
@@ -37,9 +41,26 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }) {
     }
 
     if (mode === 'register') {
+      if (!name.trim()) {
+        setError('Please enter your full name.');
+        return;
+      }
       try {
-        const { patient, welcomeMail } = registerPatient({ name, email: cleanEmail, password });
         setSubmitting(true);
+        const availability = await checkEmailAvailability(cleanEmail);
+        if (!availability.available) {
+          setSubmitting(false);
+          setError(availability.message || EMAIL_ALREADY_USED_MESSAGE);
+          return;
+        }
+        const { patient, welcomeMail } = registerPatient({ name, email: cleanEmail, password });
+        const syncRes = await syncPatientToServer(patient);
+        if (syncRes?.conflict) {
+          rollbackLocalRegistration({ patientId: patient.id, mailId: welcomeMail.id });
+          setSubmitting(false);
+          setError(syncRes.message || EMAIL_ALREADY_USED_MESSAGE);
+          return;
+        }
         const emailStatus = await dispatchWelcomeEmail({
           to: patient.email,
           name: patient.name,
@@ -162,7 +183,7 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }) {
 
           <form onSubmit={handleSubmit} className="space-y-3.5">
             {error && (
-              <div className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700">
+              <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-xs font-bold text-red-700">
                 {error}
               </div>
             )}
@@ -212,8 +233,15 @@ export default function AuthModal({ isOpen, onClose, onLoginSuccess }) {
                   required
                   placeholder="you@example.com"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="w-full text-xs pl-10 pr-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-brand-green"
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    if (error) setError('');
+                  }}
+                  className={`w-full text-xs pl-10 pr-4 py-2.5 rounded-xl border focus:outline-none focus:ring-2 ${
+                    /already used|valid email/i.test(error)
+                      ? 'border-red-500 focus:ring-red-200'
+                      : 'border-slate-200 focus:ring-brand-green'
+                  }`}
                 />
               </div>
             </div>

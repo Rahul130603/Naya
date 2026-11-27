@@ -157,19 +157,19 @@ export default function ConditionDetailPage({ onBookAppointment, onStartVideoCon
 
               <div className="mt-5 space-y-2.5">
                 <button
+                  onClick={() => onBookAppointment(relevantDoctors[0] || DOCTORS[0], 'online')}
+                  className="w-full py-3 rounded-xl bg-brand-navy hover:bg-brand-navy-dark text-white font-bold text-xs shadow-md transition flex items-center justify-center gap-2"
+                >
+                  <Calendar className="w-4 h-4" />
+                  <span>Book Online Consultation (Video / Audio)</span>
+                </button>
+
+                <button
                   onClick={() => onStartVideoConsult(relevantDoctors[0] || DOCTORS[0])}
                   className="w-full py-3 rounded-xl bg-brand-green hover:bg-brand-green-dark text-white font-bold text-xs shadow-md transition flex items-center justify-center gap-2"
                 >
                   <Video className="w-4 h-4" />
-                  <span>Start Private Call (₹{relevantDoctors[0]?.videoFee || 599})</span>
-                </button>
-
-                <button
-                  onClick={() => onBookAppointment(relevantDoctors[0] || DOCTORS[0], 'clinic')}
-                  className="w-full py-3 rounded-xl bg-brand-navy hover:bg-brand-navy-dark text-white font-bold text-xs shadow-md transition flex items-center justify-center gap-2"
-                >
-                  <Calendar className="w-4 h-4" />
-                  <span>Book In-Clinic Appointment</span>
+                  <span>Start Instant Call (₹{relevantDoctors[0]?.videoFee || 599})</span>
                 </button>
               </div>
 
@@ -235,26 +235,20 @@ export default function ConditionDetailPage({ onBookAppointment, onStartVideoCon
                     <div>
                       <h4 className="font-bold text-brand-navy text-base">{doc.name}</h4>
                       <p className="text-xs text-brand-green font-bold">{doc.specialty}</p>
-                      <p className="text-[11px] text-slate-400">{doc.experience} Years • {doc.clinicName}</p>
+                      <p className="text-[11px] text-slate-400">{doc.experience} Years • Online Video &amp; Audio</p>
                     </div>
                   </div>
                   <p className="text-xs text-slate-600 line-clamp-2">{doc.about}</p>
                 </div>
 
                 <div className="mt-4 pt-3 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3">
-                  <span className="text-sm font-extrabold text-brand-navy">₹{doc.fee} (Visit) / ₹{doc.videoFee} (Call)</span>
+                  <span className="text-sm font-extrabold text-brand-navy">₹{doc.videoFee || doc.fee} (Video / Audio)</span>
                   <div className="flex gap-2">
                     <button
-                      onClick={() => onStartVideoConsult(doc)}
-                      className="px-3 py-1.5 rounded-xl bg-emerald-50 text-brand-green-dark border border-emerald-200 text-xs font-bold hover:bg-brand-green hover:text-white transition"
-                    >
-                      Call Now
-                    </button>
-                    <button
-                      onClick={() => onBookAppointment(doc, 'clinic')}
+                      onClick={() => onBookAppointment(doc, 'online')}
                       className="px-3.5 py-1.5 rounded-xl bg-brand-navy text-white text-xs font-bold hover:bg-brand-navy-dark transition"
                     >
-                      Book Visit
+                      Book Online
                     </button>
                   </div>
                 </div>

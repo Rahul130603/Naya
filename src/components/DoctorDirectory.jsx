@@ -1,6 +1,5 @@
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { 
-  MapPin, 
   Clock, 
   Calendar, 
   Video, 
@@ -11,8 +10,36 @@ import {
   Lock
 } from 'lucide-react';
 import { DOCTORS, SPECIALTIES } from '../data/healthcareData';
+import { formatTime, hasSavedSchedule, hydrateSchedule, loadSchedule, slotsForDate, subscribeSchedule } from '../lib/practiceSchedule';
+import { getDoctorProfileOverride, hydratePublicDoctors, listPublicDoctors, subscribeRegistry } from '../lib/doctorRegistry';
 import MagneticButton from './ui/MagneticButton';
 import ShinyText from './ui/ShinyText';
+
+const normalizeText = (value = '') => String(value).toLowerCase().replace(/[’']/g, "'").trim();
+
+const matchesSpecialty = (docSpecialty = '', filterSpecialty = '') => {
+  if (!filterSpecialty || filterSpecialty === 'All') return true;
+  const doc = normalizeText(docSpecialty);
+  const target = normalizeText(filterSpecialty);
+  if (doc.includes(target) || target.includes(doc)) return true;
+  const aliases = {
+    'clinical sexologist': ['sexolog'],
+    'andrologist & urologist': ['androlog', 'urolog'],
+    "women's sexual health": ["women's sexual", 'female sexual'],
+    'psychologist & sex therapist': ['psychosexual', 'sex therap', 'psycholog'],
+    'venereologist / sti specialist': ['sti', 'venereolog', 'std'],
+    'pelvic floor physiotherapist': ['pelvic'],
+  };
+  return (aliases[target] || []).some((token) => doc.includes(token));
+};
+
+const parseLanguages = (languages) => {
+  if (Array.isArray(languages) && languages.length) return languages;
+  if (typeof languages === 'string' && languages.trim()) {
+    return languages.split(',').map((item) => item.trim()).filter(Boolean);
+  }
+  return ['Tamil', 'English'];
+};
 
 // Some profile photos point at remote URLs that can 404; fall back to a tidy
 // initials avatar instead of the browser's broken-image placeholder.
@@ -37,19 +64,126 @@ export default function DoctorDirectory({
   onStartVideoConsult
 }) {
   const [filterAvailability, setFilterAvailability] = useState('all'); // all | today | tomorrow
-  const [filterMode, setFilterMode] = useState('all'); // all | clinic | video
   const [sortBy, setSortBy] = useState('rating'); // rating | experience | fee
 
-  // Filter Doctors
-  const filteredDoctors = DOCTORS.filter((doc) => {
+  // Approved clinicians live in the local registry & shared backend registry.
+  const [registryVersion, setRegistryVersion] = useState(0);
+  const [scheduleVersion, setScheduleVersion] = useState(0);
+  useEffect(() => {
+    void hydratePublicDoctors();
+    return subscribeRegistry(() => setRegistryVersion((value) => value + 1));
+  }, []);
+  useEffect(() => subscribeSchedule(() => setScheduleVersion((value) => value + 1)), []);
+  void scheduleVersion;
+
+  const registryDoctors = useMemo(() => {
+    void registryVersion;
+    const accounts = listPublicDoctors();
+    return accounts
+      .filter((account) => !DOCTORS.some((doc) => doc.name.toLowerCase() === account.name.toLowerCase()))
+      .map((account) => ({
+        id: account.id,
+        name: account.name,
+        specialty: account.specialty || 'Clinical Sexologist',
+        degree: [account.qualifications, account.university].filter(Boolean).join(' · ') || 'MBBS, Sexual Medicine',
+        experience: parseInt(String(account.experience || ''), 10) || 10,
+        rating: 98,
+        reviewsCount: 0,
+        city: account.city || 'Chennai',
+        area: '',
+        clinicName: account.clinicName || account.clinic || 'Nayacura Partner Clinic',
+        clinicAddress: account.city || 'Chennai',
+        fee: Number(account.fee) || 800,
+        videoFee: Number(account.videoFee) || 599,
+        photo: account.photoUrl || initialsAvatar(account.name),
+        languages: parseLanguages(account.languages),
+        about: account.about || `${account.name} is a verified ${account.specialty || 'sexual wellness specialist'} serving patients in ${account.city || 'Chennai'} with confidential, judgment-free care.`,
+        services: ['Confidential Consultation', 'Private Follow-up'],
+        availableToday: true,
+        slots: {
+          today: ['10:00 AM', '11:00 AM', '04:00 PM', '05:00 PM'],
+          tomorrow: ['10:30 AM', '12:00 PM', '03:00 PM', '06:00 PM'],
+        },
+      }));
+  }, [registryVersion]);
+
+  // Pull published schedules so availability matches what the doctor saved.
+  useEffect(() => {
+    [...registryDoctors, ...DOCTORS].forEach((doc) => {
+      void hydrateSchedule(doc.name);
+    });
+  }, [registryDoctors]);
+
+  const slotsForTargetDay = (schedule, target) => {
+    const primary = slotsForDate(schedule, target, 'online');
+    if (primary.length > 0) {
+      return primary.some((slot) => slot.selected) ? primary : primary.slice(0, 4);
+    }
+    return [];
+  };
+
+  /**
+   * Slot pills & availability state for a card. When the clinician has published
+   * a practice schedule we show their real saved slots; otherwise the curated
+   * demo times are used.
+   */
+  const resolveCardAvailability = (doc) => {
+    if (!hasSavedSchedule(doc.name)) {
+      const base = doc.availableToday ? doc.slots.today : doc.slots.tomorrow;
+      return {
+        availableToday: doc.availableToday,
+        dayLabel: doc.availableToday ? 'Today' : 'Tomorrow',
+        slots: base.slice(0, 4).map((label) => ({ label, extended: false })),
+      };
+    }
+    const schedule = loadSchedule(doc.name);
+    const today = new Date();
+    const todaySlots = slotsForTargetDay(schedule, today);
+    if (todaySlots.length > 0) {
+      return {
+        availableToday: true,
+        dayLabel: 'Today',
+        slots: todaySlots,
+      };
+    }
+    const tomorrow = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1);
+    const tomorrowSlots = slotsForTargetDay(schedule, tomorrow);
+    if (tomorrowSlots.length > 0) {
+      return {
+        availableToday: false,
+        dayLabel: 'Tomorrow',
+        slots: tomorrowSlots,
+      };
+    }
+    return {
+      availableToday: false,
+      dayLabel: 'Today',
+      slots: [],
+    };
+  };
+
+  // Filter Doctors (merge any locally saved clinician profile/photo overrides)
+  const filteredDoctors = [...registryDoctors, ...DOCTORS].map((doc) => {
+    const override = getDoctorProfileOverride(doc.email, doc.name);
+    if (!override) return doc;
+    return {
+      ...doc,
+      specialty: override.specialty || doc.specialty,
+      clinicName: override.clinicName || override.clinic || doc.clinicName,
+      city: override.city || doc.city,
+      videoFee: override.videoFee ? Number(override.videoFee) : doc.videoFee,
+      about: override.about || doc.about,
+      photo: override.photoUrl || doc.photo,
+    };
+  }).filter((doc) => {
     // Specialty filter
     if (selectedSpecialty && selectedSpecialty !== 'All') {
-      if (!doc.specialty.toLowerCase().includes(selectedSpecialty.toLowerCase())) {
+      if (!matchesSpecialty(doc.specialty, selectedSpecialty)) {
         return false;
       }
     }
     // Availability filter
-    if (filterAvailability === 'today' && !doc.availableToday) {
+    if (filterAvailability === 'today' && !resolveCardAvailability(doc).availableToday) {
       return false;
     }
     return true;
@@ -59,6 +193,13 @@ export default function DoctorDirectory({
     if (sortBy === 'fee') return a.fee - b.fee;
     return 0;
   });
+
+  /** Extended slots read as a range so the extra time is obvious. */
+  const slotPillLabel = (slot) => {
+    if (!slot.extended || typeof slot.endMinutes !== 'number') return slot.label;
+    const hh = `${String(Math.floor(slot.endMinutes / 60)).padStart(2, '0')}:${String(slot.endMinutes % 60).padStart(2, '0')}`;
+    return `${slot.label} – ${formatTime(hh)} · 1h`;
+  };
 
   return (
     <section id="doctor-directory" className="py-8 bg-slate-50 min-h-screen">
@@ -83,7 +224,7 @@ export default function DoctorDirectory({
             </h1>
             
             <p className="mt-2.5 text-slate-700 font-semibold text-sm sm:text-base leading-relaxed">
-              Consult verified European Board & MCI certified sexologists. Select clinic consultation or instant confidential audio/video call with zero waiting time.
+              Consult verified European Board &amp; MCI certified sexologists online via confidential video or audio call with zero waiting time.
             </p>
 
             <div className="mt-6 flex flex-wrap items-center gap-4">
@@ -92,15 +233,15 @@ export default function DoctorDirectory({
                 className="flex items-center gap-2.5 px-6 py-3.5 bg-[#16A34A] hover:bg-[#15803D] text-white font-bold rounded-2xl shadow-md transition-all text-xs"
               >
                 <Video className="w-4 h-4" />
-                <span>Instant Video Consult in 60s</span>
+                <span>Instant Video / Audio Consult in 60s</span>
               </MagneticButton>
               <div className="flex items-center gap-2 text-xs font-bold text-slate-700 bg-white px-4 py-2.5 rounded-2xl border border-emerald-200 shadow-sm">
                 <ShieldCheck className="w-4 h-4 text-[#16A34A]" />
-                <span>MCI & European Board Certified</span>
+                <span>MCI &amp; European Board Certified</span>
               </div>
               <div className="flex items-center gap-2 text-xs font-bold text-slate-700 bg-white px-4 py-2.5 rounded-2xl border border-emerald-200 shadow-sm">
                 <Lock className="w-4 h-4 text-[#16A34A]" />
-                <span>Zero Booking Fee • 100% Private</span>
+                <span>100% Online • Video &amp; Audio</span>
               </div>
             </div>
           </div>
@@ -166,22 +307,6 @@ export default function DoctorDirectory({
                 Available Today
               </button>
             </div>
-
-            {/* Mode Filter */}
-            <div className="inline-flex rounded-xl bg-slate-100 p-1 text-xs font-semibold">
-              <button
-                onClick={() => setFilterMode('all')}
-                className={`px-3 py-1 rounded-lg transition ${filterMode === 'all' ? 'bg-white text-brand-navy shadow-sm' : 'text-slate-600'}`}
-              >
-                All Modes
-              </button>
-              <button
-                onClick={() => setFilterMode('video')}
-                className={`px-3 py-1 rounded-lg transition ${filterMode === 'video' ? 'bg-brand-green text-white shadow-sm' : 'text-slate-600'}`}
-              >
-                Discreet Video Call
-              </button>
-            </div>
           </div>
 
           {/* Sort Dropdown */}
@@ -219,7 +344,10 @@ export default function DoctorDirectory({
           </div>
         ) : (
           <div className="space-y-6">
-            {filteredDoctors.map((doc) => (
+            {filteredDoctors.map((doc) => {
+              const availability = resolveCardAvailability(doc);
+              const onlineFee = doc.videoFee || doc.fee;
+              return (
               <div
                 key={doc.id}
                 className="group rounded-2xl border border-slate-200/90 bg-white p-5 shadow-card-soft transition-all duration-300 hover:border-brand-green/30 hover:shadow-xl sm:rounded-3xl sm:p-7"
@@ -249,7 +377,7 @@ export default function DoctorDirectory({
                     <div className="flex min-w-0 flex-1 flex-col items-start gap-1.5 md:flex-none">
                       <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-bold leading-none text-brand-green-dark">
                         <ThumbsUp className="h-3 w-3 text-brand-green" aria-hidden="true" />
-                        {doc.rating}% ({doc.reviewsCount} Stories)
+                        {doc.reviewsCount > 0 ? `${doc.rating}% (${doc.reviewsCount} Stories)` : 'Newly verified'}
                       </span>
                       <span className="text-xs font-semibold text-slate-500">
                         {doc.experience} Years Experience
@@ -274,26 +402,23 @@ export default function DoctorDirectory({
 
                       {/* Fee box — tablet & desktop */}
                       <div className="hidden shrink-0 rounded-2xl border border-slate-100 bg-slate-50 px-4 py-3 text-right sm:block">
-                        <div className="text-xs font-semibold text-slate-400">Confidential Consultation</div>
+                        <div className="text-xs font-semibold text-slate-400">Online Consultation</div>
                         <div className="text-lg font-extrabold text-brand-navy">
-                          ₹{doc.fee} <span className="text-[10px] font-normal text-slate-400">at clinic</span>
+                          ₹{onlineFee}
                         </div>
-                        <div className="mt-0.5 text-xs font-bold text-emerald-600">
-                          Discreet Video: ₹{doc.videoFee}
+                        <div className="mt-0.5 text-[11px] font-bold text-emerald-600">
+                          Video or Audio Call
                         </div>
                       </div>
                     </div>
 
-                    {/* Fee strip — phone: full width so the prices stop floating mid-card */}
-                    <div className="mt-3 grid grid-cols-2 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 sm:hidden">
-                      <div className="min-w-0 px-3 py-2.5">
-                        <div className="text-[10px] font-bold uppercase tracking-wide text-slate-500">In-Clinic Visit</div>
-                        <div className="mt-0.5 text-base font-extrabold text-brand-navy">₹{doc.fee}</div>
+                    {/* Fee strip — phone */}
+                    <div className="mt-3 flex items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 sm:hidden">
+                      <div>
+                        <div className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Online Consultation</div>
+                        <div className="text-[11px] font-semibold text-emerald-600">Video or Audio Call</div>
                       </div>
-                      <div className="min-w-0 border-l border-slate-200 px-3 py-2.5">
-                        <div className="text-[10px] font-bold uppercase tracking-wide text-slate-500">Discreet Video</div>
-                        <div className="mt-0.5 text-base font-extrabold text-emerald-600">₹{doc.videoFee}</div>
-                      </div>
+                      <div className="text-base font-extrabold text-brand-navy">₹{onlineFee}</div>
                     </div>
 
                     {/* About snippet */}
@@ -301,23 +426,23 @@ export default function DoctorDirectory({
                       {doc.about}
                     </p>
 
-                    {/* Clinic Address & Languages */}
+                    {/* Online Consult Info & Languages */}
                     <div className="mt-4 grid grid-cols-1 gap-3 text-xs text-slate-600 sm:grid-cols-2">
                       <div className="flex items-start gap-2">
-                        <MapPin className="mt-0.5 h-4 w-4 flex-shrink-0 text-slate-400" />
+                        <Video className="mt-0.5 h-4 w-4 flex-shrink-0 text-brand-green" />
                         <div className="min-w-0">
-                          <span className="font-bold text-slate-800">{doc.clinicName}</span>
-                          <p className="text-slate-500 break-words">{doc.clinicAddress}</p>
+                          <span className="font-bold text-slate-800">100% Online Consultation</span>
+                          <p className="text-slate-500">Video &amp; Audio Call supported · {doc.city}</p>
                         </div>
                       </div>
 
                       <div className="flex items-start gap-2">
                         <Clock className="mt-0.5 h-4 w-4 flex-shrink-0 text-emerald-500" />
                         <div className="min-w-0">
-                          {doc.availableToday ? (
-                            <span className="font-bold text-emerald-600">Available Today (100% Private Room)</span>
+                          {availability.availableToday ? (
+                            <span className="font-bold text-emerald-600">Available Today (Private Online Room)</span>
                           ) : (
-                            <span className="font-bold text-amber-600">Next Available Tomorrow</span>
+                            <span className="font-bold text-amber-600">Next Available {availability.dayLabel}</span>
                           )}
                           <p className="text-slate-500">
                             Languages: {doc.languages.join(', ')}
@@ -339,36 +464,36 @@ export default function DoctorDirectory({
                     <div className="mt-5 border-t border-slate-100 pt-4">
                       <div className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                         <Calendar className="h-3.5 w-3.5 text-brand-green" />
-                        Confidential Slots for {doc.availableToday ? 'Today' : 'Tomorrow'}
+                        Online Slots for {availability.dayLabel}
                       </div>
                       <div className="grid grid-cols-4 gap-1.5 sm:flex sm:flex-wrap sm:gap-2">
-                        {(doc.availableToday ? doc.slots.today : doc.slots.tomorrow).slice(0, 4).map((slot, idx) => (
+                        {availability.slots.slice(0, 8).map((slot, idx) => (
                           <span
                             key={idx}
                             className="rounded-lg border border-emerald-200/70 bg-emerald-50/70 px-1 py-1.5 text-center text-[11px] font-bold text-brand-green-dark sm:px-2.5"
                           >
-                            {slot}
+                            {slotPillLabel(slot)}
                           </span>
                         ))}
+                        {availability.slots.length > 8 && (
+                          <span className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-center text-[11px] font-bold text-slate-600">
+                            +{availability.slots.length - 8} more
+                          </span>
+                        )}
                       </div>
+                      {availability.slots.length === 0 && (
+                        <p className="text-[11px] text-slate-400">No slots published for this day.</p>
+                      )}
                     </div>
 
-                    {/* Action Buttons */}
+                    {/* Action Button */}
                     <div className="mt-5 flex flex-col gap-2.5 sm:mt-6 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
                       <button
-                        onClick={() => onBookAppointment(doc, 'clinic')}
+                        onClick={() => onBookAppointment(doc, 'online')}
                         className="flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl bg-brand-navy px-6 py-2.5 text-xs font-bold text-white shadow-md transition hover:bg-brand-navy-dark hover:shadow-glow-navy sm:flex-none"
                       >
                         <Calendar className="h-4 w-4 text-brand-green-light" aria-hidden="true" />
-                        <span>Book Confidential In-Clinic Visit</span>
-                      </button>
-
-                      <button
-                        onClick={() => onStartVideoConsult(doc)}
-                        className="group-btn flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-emerald-300 bg-brand-green-soft px-5 py-2.5 text-xs font-bold text-brand-green-dark transition hover:bg-brand-green hover:text-white sm:flex-none"
-                      >
-                        <Video className="h-4 w-4" aria-hidden="true" />
-                        <span>Discreet Video/Audio Call (₹{doc.videoFee})</span>
+                        <span>Book Online Consultation</span>
                       </button>
                     </div>
 
@@ -376,7 +501,8 @@ export default function DoctorDirectory({
 
                 </div>
               </div>
-            ))}
+              );
+            })}
           </div>
         )}
 

@@ -21,7 +21,16 @@ import {
   Upload,
   User,
 } from 'lucide-react';
-import { HELLO_EMAIL, dispatchWelcomeEmail, submitApplication } from '../lib/doctorRegistry';
+import {
+  EMAIL_ALREADY_USED_MESSAGE,
+  HELLO_EMAIL,
+  checkEmailAvailability,
+  dispatchWelcomeEmail,
+  isEmailUsedLocally,
+  rollbackLocalRegistration,
+  submitApplication,
+  syncApplicationToServerWithStatus,
+} from '../lib/doctorRegistry';
 import { saveDocument } from '../lib/documentStore';
 
 const SPECIALTIES = [
@@ -102,7 +111,11 @@ export default function DoctorRegisterPage() {
   const validate = () => {
     const next = {};
     if (!form.fullName.trim()) next.fullName = 'Enter your full name as per council records.';
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email)) next.email = 'Enter a valid professional email.';
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) {
+      next.email = 'Enter a valid professional email.';
+    } else if (isEmailUsedLocally(form.email)) {
+      next.email = EMAIL_ALREADY_USED_MESSAGE;
+    }
     if (!form.city.trim()) next.city = 'Enter your city of practice.';
     if (!form.languages.trim()) next.languages = 'List the languages you consult in.';
     if (!form.specialty) next.specialty = 'Choose your primary specialty.';
@@ -125,20 +138,57 @@ export default function DoctorRegisterPage() {
       return;
     }
     setSubmitting(true);
-    const application = submitApplication(form, { deferDispatch: true });
-    await saveDocument(`${application.id}:certificate`, certificateFile);
-    if (cvFile) await saveDocument(`${application.id}:cv`, cvFile);
-    const emailStatus = await dispatchWelcomeEmail({
-      to: application.email,
-      name: application.fullName,
-      role: 'doctor',
-      applicationId: application.id,
-      mailId: application.welcomeMailId,
-    });
-    setSubmitting(false);
-    setMailDelivery(emailStatus);
-    setSubmitted(application);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    try {
+      const availability = await checkEmailAvailability(form.email);
+      if (!availability.available) {
+        setSubmitting(false);
+        setErrors((current) => ({
+          ...current,
+          email: availability.message || EMAIL_ALREADY_USED_MESSAGE,
+        }));
+        document.getElementById('clinician-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
+      }
+
+      const application = submitApplication(form, { deferDispatch: true, deferSync: true });
+      const [syncRes] = await Promise.all([
+        syncApplicationToServerWithStatus(application),
+        saveDocument(`${application.id}:certificate`, certificateFile),
+        ...(cvFile ? [saveDocument(`${application.id}:cv`, cvFile)] : []),
+      ]);
+      if (syncRes?.conflict) {
+        rollbackLocalRegistration({
+          applicationId: application.id,
+          mailId: application.welcomeMailId,
+        });
+        setSubmitting(false);
+        setErrors((current) => ({
+          ...current,
+          email: syncRes.message || EMAIL_ALREADY_USED_MESSAGE,
+        }));
+        document.getElementById('clinician-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        return;
+      }
+
+      const emailStatus = await dispatchWelcomeEmail({
+        to: application.email,
+        name: application.fullName,
+        role: 'doctor',
+        applicationId: application.id,
+        mailId: application.welcomeMailId,
+      });
+      setSubmitting(false);
+      setMailDelivery(emailStatus);
+      setSubmitted(application);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch (err) {
+      setSubmitting(false);
+      setErrors((current) => ({
+        ...current,
+        email: err?.message || EMAIL_ALREADY_USED_MESSAGE,
+      }));
+      document.getElementById('clinician-form')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
   };
 
   if (submitted) {
@@ -214,6 +264,14 @@ export default function DoctorRegisterPage() {
             </div>
 
             <form id="clinician-form" onSubmit={handleSubmit} className="mt-5" noValidate>
+              {errors.email && /already used/i.test(errors.email) && (
+                <div
+                  role="alert"
+                  className="mb-4 rounded-2xl border border-[#F0B4AE] bg-[#FEF2F2] px-4 py-3 text-xs font-bold text-[#B42318]"
+                >
+                  {errors.email}
+                </div>
+              )}
               <div className="overflow-hidden rounded-3xl border border-[#DCE7F6] bg-white shadow-sm">
                 <div className="space-y-6 p-5 sm:p-6 lg:max-h-[70vh] lg:min-h-[460px] lg:overflow-y-auto">
               <section className="border-t border-[#EEF3FA] pt-6 first:border-t-0 first:pt-0">

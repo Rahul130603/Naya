@@ -283,13 +283,17 @@ export default function DoctorRegister() {
       if (cause instanceof ApiError && cause.code === 'VALIDATION_ERROR') {
         setFieldErrors((cause.details ?? {}) as Record<string, string[]>);
       }
-      setError(
-        cause instanceof ApiError && cause.status === 409
-          ? 'A clinician account or pending application already exists with this email address.'
-          : cause instanceof Error
+      if (cause instanceof ApiError && cause.status === 409) {
+        const usedMessage = 'This email is already used. Please sign in or use a different email address.';
+        setFieldErrors((current) => ({ ...current, email: [usedMessage] }));
+        setError(usedMessage);
+      } else {
+        setError(
+          cause instanceof Error
             ? cause.message
-            : 'Could not submit your application. Please verify your details.'
-      );
+            : 'Could not submit your application. Please verify your details.',
+        );
+      }
     } finally {
       setSubmitting(false);
     }

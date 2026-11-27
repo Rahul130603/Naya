@@ -49,10 +49,18 @@ const formatDuration = (totalSeconds) => {
     : `${pad(minutes)}:${pad(seconds)}`;
 };
 
-export default function VideoCallRoom({ roomCode, role, selfName, peerName, appointment, onClose }) {
+export default function VideoCallRoom({
+  roomCode,
+  role,
+  selfName,
+  peerName,
+  appointment,
+  defaultCamOn = true,
+  onClose,
+}) {
   const { room, bothPresent } = useVideoRoom(roomCode);
   const [micOn, setMicOn] = useState(true);
-  const [camOn, setCamOn] = useState(true);
+  const [camOn, setCamOn] = useState(defaultCamOn);
   const [mediaError, setMediaError] = useState('');
   const [copied, setCopied] = useState(false);
   const [tick, setTick] = useState(0);

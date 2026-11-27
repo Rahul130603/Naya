@@ -5,8 +5,11 @@ import {
   approveApplication,
   approveDirectDoctor,
   findAccountByEmail,
+  hydrateApplications,
+  hydratePublicDoctors,
   listApplications,
   listMail,
+  listPublicDoctors,
   rejectApplication,
   sendApprovalEmails,
   subscribeRegistry,
@@ -56,7 +59,24 @@ const SECTION_TITLES = {
   security: 'HIPAA Compliance & Security',
   store: 'Wellness Store Catalog',
   orders: 'Wellness Store Orders Ledger',
+  activity: 'Patient Activity (Live)',
   settings: 'System Configuration'
+};
+
+const ACTIVITY_LABELS = {
+  BOOKING_REQUEST: 'Appointment',
+  STORE_ORDER: 'Medicine order',
+  VIDEO_CONSULT: 'Consult request',
+  PRESCRIPTION: 'Prescription',
+};
+
+const activityTypeLabel = (type) => ACTIVITY_LABELS[type] || type;
+
+const activityTone = (type) => {
+  if (type === 'STORE_ORDER') return 'bg-purple-50 text-purple-700 border-purple-200';
+  if (type === 'VIDEO_CONSULT') return 'bg-blue-50 text-[#0B3B82] border-blue-200';
+  if (type === 'PRESCRIPTION') return 'bg-amber-50 text-amber-700 border-amber-200';
+  return 'bg-emerald-50 text-[#128D28] border-emerald-200';
 };
 
 export default function AdminDashboardPage({ user, onLogout }) {
@@ -77,11 +97,110 @@ export default function AdminDashboardPage({ user, onLogout }) {
   const [docUrls, setDocUrls] = useState({});
   const [storeProducts, setStoreProducts] = useState(() => listStoreProducts());
   const [outboxEmails, setOutboxEmails] = useState(() => listMail());
+  const [activityItems, setActivityItems] = useState([]);
+  const [activityState, setActivityState] = useState('idle');
+  const [consoleEmail, setConsoleEmail] = useState('');
+  const [consolePassword, setConsolePassword] = useState('');
+  const [consoleError, setConsoleError] = useState('');
+  const [consoleBusy, setConsoleBusy] = useState(false);
 
-  useEffect(() => subscribeRegistry(() => {
-    setDoctorApplications(listApplications());
-    setOutboxEmails(listMail());
-  }), []);
+  const loadActivity = async () => {
+    try {
+      const response = await fetch('/api/admin/activity', { credentials: 'include' });
+      if (response.status === 401) {
+        setActivityState('unauthorized');
+        return;
+      }
+      if (!response.ok) throw new Error(String(response.status));
+      const data = await response.json();
+      setActivityItems(Array.isArray(data.items) ? data.items : []);
+      setActivityState('ready');
+    } catch {
+      setActivityState('error');
+    }
+  };
+
+  const connectConsole = async (event) => {
+    event.preventDefault();
+    setConsoleBusy(true);
+    setConsoleError('');
+    try {
+      let token = document.cookie
+        .split('; ')
+        .find((row) => row.startsWith('nayacura_csrf='))
+        ?.split('=')[1];
+      if (!token) {
+        await fetch('/api/auth/csrf', { credentials: 'include' }).catch(() => null);
+        token = document.cookie
+          .split('; ')
+          .find((row) => row.startsWith('nayacura_csrf='))
+          ?.split('=')[1];
+      }
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'X-CSRF-Token': decodeURIComponent(token) } : {}),
+        },
+        body: JSON.stringify({
+          email: consoleEmail.trim(),
+          password: consolePassword,
+          role: 'ADMIN',
+          skipMfa: true,
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.message || 'Sign-in failed.');
+      setConsolePassword('');
+      setActivityState('loading');
+      await loadActivity();
+    } catch (error) {
+      setConsoleError(error.message || 'Sign-in failed.');
+    } finally {
+      setConsoleBusy(false);
+    }
+  };
+
+  // Live patient activity (bookings, store orders, consult requests).
+  useEffect(() => {
+    if (activeSection !== 'activity') return;
+    setActivityState('loading');
+    void loadActivity();
+  }, [activeSection]);
+
+  useEffect(() => {
+    void hydrateApplications();
+    void hydratePublicDoctors();
+    return subscribeRegistry(() => {
+      setDoctorApplications(listApplications());
+      setOutboxEmails(listMail());
+      const approvedNames = new Set(
+        listPublicDoctors().map((item) => String(item.name || '').trim().toLowerCase()),
+      );
+      setPendingDoctors((current) =>
+        current.filter((item) => !approvedNames.has(String(item.name || '').trim().toLowerCase())),
+      );
+      setApprovedDoctors((current) => {
+        const dynamic = listPublicDoctors().map((doc) => ({
+          id: doc.id,
+          name: doc.name,
+          regNo: doc.regNo || 'NMC-VERIFIED',
+          specialty: doc.specialty || 'Clinical Sexologist',
+          status: 'VERIFIED & ACTIVE',
+          consultsToday: 0,
+          satisfaction: '100%',
+        }));
+        const seen = new Set();
+        return [...dynamic, ...current].filter((item) => {
+          const key = String(item.name || '').trim().toLowerCase();
+          if (!key || seen.has(key)) return false;
+          seen.add(key);
+          return true;
+        });
+      });
+    });
+  }, []);
   useEffect(() => subscribeStoreCatalog(setStoreProducts), []);
 
   const showAdminToast = (message) => {
@@ -130,17 +249,35 @@ export default function AdminDashboardPage({ user, onLogout }) {
   ]);
 
   // Approved doctors list
-  const [approvedDoctors, setApprovedDoctors] = useState([
-    {
-      id: 'DOC-VER-4481',
-      name: 'Dr. Arvind Swaminathan',
-      regNo: 'TN-MED-44819',
-      specialty: 'Clinical Sexologist & Andrologist',
+  const [approvedDoctors, setApprovedDoctors] = useState(() => {
+    const seed = [
+      {
+        id: 'DOC-VER-4481',
+        name: 'Dr. Arvind Swaminathan',
+        regNo: 'TN-MED-44819',
+        specialty: 'Clinical Sexologist & Andrologist',
+        status: 'VERIFIED & ACTIVE',
+        consultsToday: 4,
+        satisfaction: '99.4%',
+      },
+    ];
+    const dynamic = listPublicDoctors().map((doc) => ({
+      id: doc.id,
+      name: doc.name,
+      regNo: doc.regNo || 'NMC-VERIFIED',
+      specialty: doc.specialty || 'Clinical Sexologist',
       status: 'VERIFIED & ACTIVE',
-      consultsToday: 4,
-      satisfaction: '99.4%'
-    }
-  ]);
+      consultsToday: 0,
+      satisfaction: '100%',
+    }));
+    const seen = new Set();
+    return [...dynamic, ...seed].filter((item) => {
+      const key = String(item.name || '').trim().toLowerCase();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  });
 
   // Plain-Box Logistics Orders
   const [logisticsOrders, setLogisticsOrders] = useState([
@@ -316,6 +453,7 @@ export default function AdminDashboardPage({ user, onLogout }) {
     { key: 'security', label: 'HIPAA & Security', icon: ShieldCheck },
     { key: 'store', label: 'Store Catalog', icon: ShoppingBag },
     { key: 'orders', label: 'Store Orders Ledger', icon: FileCheck },
+    { key: 'activity', label: 'Patient Activity', icon: Activity },
   ];
 
   return (
@@ -1164,8 +1302,101 @@ export default function AdminDashboardPage({ user, onLogout }) {
             </div>
           )}
 
-          {/* ==================== G. SYSTEM SETTINGS ==================== */}
-          {activeSection === 'settings' && (
+          {activeSection === 'activity' && (
+            <div className="space-y-5 animate-fade-in">
+              <div className="p-5 rounded-2xl bg-white border border-[#DCE7F6] shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <h3 className="text-lg font-extrabold text-[#0B3B82]">Patient Activity (Live)</h3>
+                  <p className="text-xs text-slate-500 mt-1">
+                    Appointments booked, medicines ordered and consults requested from the website.
+                  </p>
+                </div>
+                <span className="px-3 py-1 rounded-full bg-emerald-50 text-[#128D28] text-xs font-extrabold border border-emerald-200">
+                  {activityItems.length} events
+                </span>
+              </div>
+
+              {activityState === 'unauthorized' && (
+                <form onSubmit={connectConsole} className="space-y-3 rounded-2xl border border-[#DCE7F6] bg-white p-5 shadow-sm">
+                  <div>
+                    <p className="text-sm font-bold text-[#0B3B82]">Sign in to load live activity</p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      The activity feed is protected. Use your admin console credentials.
+                    </p>
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <input
+                      type="email"
+                      required
+                      value={consoleEmail}
+                      onChange={(event) => setConsoleEmail(event.target.value)}
+                      placeholder="admin@nayacura.demo"
+                      autoComplete="username"
+                      className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#16A34A] focus:outline-none focus:ring-2 focus:ring-[#16A34A]/20"
+                    />
+                    <input
+                      type="password"
+                      required
+                      value={consolePassword}
+                      onChange={(event) => setConsolePassword(event.target.value)}
+                      placeholder="Password"
+                      autoComplete="current-password"
+                      className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm focus:border-[#16A34A] focus:outline-none focus:ring-2 focus:ring-[#16A34A]/20"
+                    />
+                  </div>
+                  {consoleError && <p className="text-xs font-bold text-red-600">{consoleError}</p>}
+                  <button
+                    type="submit"
+                    disabled={consoleBusy}
+                    className="inline-flex min-h-11 items-center justify-center rounded-xl bg-[#0B3B82] px-5 py-2.5 text-sm font-bold text-white hover:bg-[#082B5E] disabled:opacity-70"
+                  >
+                    {consoleBusy ? 'Signing in…' : 'Load activity'}
+                  </button>
+                </form>
+              )}
+
+              {activityState === 'loading' && <p className="text-sm text-slate-500">Loading activity…</p>}
+              {activityState === 'error' && (
+                <p className="text-sm text-red-600">Could not load activity. Please refresh the page.</p>
+              )}
+              {activityState === 'ready' && activityItems.length === 0 && (
+                <div className="p-8 rounded-2xl bg-white border border-[#DCE7F6] text-center">
+                  <p className="text-base font-bold text-[#0B3B82]">No patient activity yet</p>
+                  <p className="mt-1 text-sm text-slate-500">
+                    Bookings, medicine orders and consult requests appear here as patients use the site.
+                  </p>
+                </div>
+              )}
+
+              <div className="space-y-3">
+                {activityItems.map((item) => (
+                  <div
+                    key={item.id}
+                    className="p-4 rounded-2xl bg-white border border-[#DCE7F6] shadow-xs flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3"
+                  >
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-extrabold border ${activityTone(item.type)}`}>
+                          {activityTypeLabel(item.type)}
+                        </span>
+                        <span className="font-mono text-[11px] text-slate-500">{item.reference}</span>
+                      </div>
+                      <p className="mt-1.5 text-sm font-bold text-slate-800">{item.summary}</p>
+                      <p className="text-xs text-slate-500">
+                        {item.patientName || 'Guest patient'}
+                        {item.phone ? ` · ${item.phone}` : ''}
+                      </p>
+                    </div>
+                    <span className="text-xs text-slate-400 shrink-0">
+                      {new Date(item.createdAt).toLocaleString('en-IN')}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ==================== G. SYSTEM SETTINGS ==================== */}          {activeSection === 'settings' && (
             <div className="p-6 rounded-2xl bg-white border border-[#DCE7F6] shadow-sm space-y-6 animate-fade-in">
               <div className="flex items-center gap-4 pb-6 border-b border-slate-200">
                 <div className="w-16 h-16 rounded-full bg-[#0B3B82] text-white text-2xl font-bold flex items-center justify-center">

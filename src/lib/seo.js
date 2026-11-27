@@ -8,10 +8,10 @@ const PUBLIC_ROUTES = {
   '/': {
     title: 'Confidential Sexual Wellness, Verified Sexologists & Intimate Care',
     description:
-      "India's confidential sexual wellness platform. Consult verified sexologists online or in-clinic, book discreet at-home hormone & STI tests, and get doctor-approved treatment in 100% plain packaging.",
+      "India's confidential sexual wellness platform. Consult verified sexologists online via encrypted video or audio calls, book discreet at-home hormone & STI tests, and get doctor-approved treatment in 100% plain packaging.",
   },
   '/consult-sexologist': {
-    title: 'Consult Verified Sexologists Online & In-Clinic',
+    title: 'Consult Verified Sexologists Online (Video & Audio)',
     description:
       'Book a private consultation with MCI/NMC-verified sexologists and andrologists for erectile dysfunction, premature ejaculation, low libido, vaginismus and intimacy concerns.',
     breadcrumb: 'Consult a Sexologist',

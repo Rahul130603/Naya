@@ -185,6 +185,48 @@ export default function MedicinesSection({ onOrderMedicine, storeOrders = [], on
     setCart([]);
     setCartStep('success');
     onOrderMedicine?.(snapshot);
+
+    // Record the order for the admin operations console (fire and forget).
+    void (async () => {
+      try {
+        const cookie = document.cookie
+          .split('; ')
+          .find((row) => row.startsWith('nayacura_csrf='))
+          ?.split('=')[1];
+        let token = cookie;
+        if (!token) {
+          await fetch('/api/auth/csrf', { credentials: 'include' }).catch(() => null);
+          token = document.cookie
+            .split('; ')
+            .find((row) => row.startsWith('nayacura_csrf='))
+            ?.split('=')[1];
+        }
+        await fetch('/api/store-orders', {
+          method: 'POST',
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'X-CSRF-Token': decodeURIComponent(token) } : {}),
+          },
+          body: JSON.stringify({
+            reference: orderId,
+            fullName: snapshot.name,
+            phone: snapshot.phone,
+            items: snapshot.lines.map((line) => ({
+              title: line.product?.title || 'Item',
+              quantity: line.quantity,
+            })),
+            totalRupees: snapshot.total,
+            address: snapshot.address,
+            city: snapshot.city,
+            postcode: snapshot.postcode,
+            paymentMode: 'COD',
+          }),
+        });
+      } catch {
+        /* admin visibility is best-effort; the order already exists locally */
+      }
+    })();
   };
 
   return (

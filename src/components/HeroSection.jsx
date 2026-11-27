@@ -343,7 +343,7 @@ export default function HeroSection({
             </div>
           </SpotlightCard>
 
-          {/* Card 2: Consult Sexologists In-Clinic */}
+          {/* Card 2: Discreet Online Audio Consult */}
           <SpotlightCard 
             spotlightColor="rgba(11, 59, 130, 0.18)"
             borderColor="hover:border-brand-navy/40"
@@ -356,22 +356,22 @@ export default function HeroSection({
                     <UserCheck className="w-6 h-6" />
                   </div>
                   <span className="rounded-full bg-blue-100/80 px-2.5 py-1 text-[11px] font-extrabold text-brand-navy">
-                    Specialist Clinics
+                    Video &amp; Audio
                   </span>
                 </div>
 
                 <h3 className="text-lg font-bold text-brand-navy group-hover:text-brand-navy-light transition">
-                  Confidential Clinic Visit
+                  Scheduled Online Consult
                 </h3>
                 <p className="mt-1 text-xs text-slate-500 font-medium">
-                  Confirmed appointments with top Sexologists, Andrologists, and Female Intimacy doctors.
+                  Book a dedicated video or audio slot with top Sexologists, Andrologists, and Female Intimacy doctors.
                 </p>
               </div>
 
               <div className="mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-400">Zero Wait Time</span>
+                <span className="text-xs font-bold text-slate-400">100% Online</span>
                 <span className="text-xs font-bold text-brand-navy flex items-center gap-1 group-hover:translate-x-1 transition">
-                  Book Visit →
+                  Book Slot →
                 </span>
               </div>
             </div>

@@ -16,10 +16,30 @@ import { env } from '../config/env';
 import { hashToken, randomToken } from '../utils/crypto';
 import { sendDoctorApproval } from '../services/mailer';
 import { applicationDocumentPath, applicationDocumentTypes, privateApplicationDocumentTypes } from '../services/clinicianApplicationDocuments';
+import { listActivity } from '../services/activity';
 
 export const adminRouter = Router();
 
 adminRouter.use(requireAuth, requireRole('ADMIN'));
+
+adminRouter.get(
+  '/activity',
+  asyncHandler(async (req, res) => {
+    const type = typeof req.query.type === 'string' ? req.query.type : undefined;
+    const search = typeof req.query.search === 'string' ? req.query.search.trim() : undefined;
+    const limit = typeof req.query.limit === 'string' ? Number(req.query.limit) : undefined;
+
+    const items = await listActivity({ type, search, limit });
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.json({
+      items,
+      counts: items.reduce<Record<string, number>>((acc, item) => {
+        acc[item.type] = (acc[item.type] || 0) + 1;
+        return acc;
+      }, {}),
+    });
+  }),
+);
 
 adminRouter.get(
   '/overview',

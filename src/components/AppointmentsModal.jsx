@@ -124,7 +124,7 @@ export default function AppointmentsModal({
                   </div>
                   <div>
                     <span className="text-slate-400 block font-medium">Amount Due</span>
-                    <span className="font-bold text-[#0B3B82]">₹{appt.fee || appt.price} (Pay on visit)</span>
+                    <span className="font-bold text-[#0B3B82]">₹{appt.fee || appt.price} (Online Session)</span>
                   </div>
                 </div>
 

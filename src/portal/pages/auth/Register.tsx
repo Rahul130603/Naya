@@ -5,6 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod/v3';
 import { ArrowRight, Check, Eye, EyeOff, LockKeyhole, ShieldCheck } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { ApiError } from '@/lib/api';
 import { dashboardFor } from '@/lib/navigation';
 import { useToast } from '@/components/ui/Toast';
 import { Button } from '@/components/ui/Button';
@@ -72,7 +73,11 @@ export default function Register() {
       });
       navigate('/dashboard', { replace: true });
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'We could not create your account.');
+      if (err instanceof ApiError && err.status === 409) {
+        setError('This email is already used. Please sign in or use a different email address.');
+      } else {
+        setError(err instanceof Error ? err.message : 'We could not create your account.');
+      }
     }
   }
 

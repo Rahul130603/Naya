@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import {
+  EMAIL_ALREADY_USED_MESSAGE,
   HELLO_EMAIL,
+  checkEmailAvailability,
   dispatchWelcomeEmail,
-  findApplicationByEmail,
   findPatientByEmail,
-  listAccounts,
+  getDoctorProfileOverride,
+  loginDoctorAccount,
   registerPatient,
+  rollbackLocalRegistration,
+  syncPatientToServer,
 } from '../lib/doctorRegistry';
 import { 
   Lock, 
@@ -52,7 +56,6 @@ export default function PatientLoginPage({ onLoginSuccess, currentUser, onLogout
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [emailError, setEmailError] = useState('');
-  const [doctorRegNo, setDoctorRegNo] = useState('');
 
   // General Loading & Feedback State
   const [isLoading, setIsLoading] = useState(false);
@@ -136,9 +139,43 @@ export default function PatientLoginPage({ onLoginSuccess, currentUser, onLogout
     e?.preventDefault();
     setEmailError('');
     setEmailPreviewUrl(null);
+    const cleanEmail = String(email || '').trim().toLowerCase();
+    if (!String(patientName || '').trim()) {
+      setEmailError('Please enter your full name.');
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      setEmailError('Please enter a valid email address.');
+      return;
+    }
+    if (!password || password.length < 6) {
+      setEmailError('Password must be at least 6 characters.');
+      return;
+    }
+
     try {
-      const { patient, welcomeMail } = registerPatient({ name: patientName, email, password });
       setIsLoading(true);
+      const availability = await checkEmailAvailability(cleanEmail);
+      if (!availability.available) {
+        setIsLoading(false);
+        setEmailError(availability.message || EMAIL_ALREADY_USED_MESSAGE);
+        return;
+      }
+
+      const { patient, welcomeMail } = registerPatient({
+        name: patientName,
+        email: cleanEmail,
+        password,
+      });
+
+      const syncRes = await syncPatientToServer(patient);
+      if (syncRes?.conflict) {
+        rollbackLocalRegistration({ patientId: patient.id, mailId: welcomeMail.id });
+        setIsLoading(false);
+        setEmailError(syncRes.message || EMAIL_ALREADY_USED_MESSAGE);
+        return;
+      }
+
       const emailStatus = await dispatchWelcomeEmail({
         to: patient.email,
         name: patient.name,
@@ -169,7 +206,7 @@ export default function PatientLoginPage({ onLoginSuccess, currentUser, onLogout
   };
 
   // Handle Email & Password Login
-  const handleEmailLogin = (e) => {
+  const handleEmailLogin = async (e) => {
     e?.preventDefault();
     setEmailError('');
     const isDoctorIdentifier = selectedRole === 'doctor';
@@ -201,45 +238,39 @@ export default function PatientLoginPage({ onLoginSuccess, currentUser, onLogout
     }
 
     if (selectedRole === 'doctor') {
-      const identifier = email.trim().toLowerCase();
-      const account = listAccounts().find((item) => (
-        item.email?.toLowerCase() === identifier
-        || item.id?.toLowerCase() === identifier
-        || item.regNo?.toLowerCase() === identifier
-      ));
-
-      if (account) {
-        if (password !== account.password) {
-          setEmailError('Incorrect password. Use the temporary password from your credentials email.');
-          return;
-        }
-        setIsLoading(true);
+      setIsLoading(true);
+      const result = await loginDoctorAccount(email, password);
+      if (result.status === 'ok' && result.account) {
+        const account = result.account;
         setTimeout(() => {
           setIsLoading(false);
           const userObj = {
             name: account.name,
             email: account.email,
             regNo: account.regNo,
+            council: account.council,
             specialty: account.specialty,
+            qualifications: account.qualifications,
+            experience: account.experience,
+            languages: account.languages,
             role: 'doctor',
             id: account.id,
             city: account.city,
-            clinic: 'Nayacura Clinician Console',
+            clinic: account.clinicName || account.clinic || 'Nayacura Partner Clinic',
+            phone: account.phone || '',
+            about: account.about || '',
+            videoFee: account.videoFee,
+            photoUrl: account.photoUrl || '',
           };
           if (onLoginSuccess) onLoginSuccess(userObj);
           setLoginSuccessMessage(`Signed in as ${userObj.name}! Redirecting...`);
           setTimeout(() => navigate('/doctor-dashboard'), 1000);
-        }, 700);
+        }, 400);
         return;
       }
-
-      const application = findApplicationByEmail(identifier);
-      if (application?.status === 'pending') {
-        setEmailError('Your clinician application is still under review. Credentials arrive by email after approval.');
-        return;
-      }
-      if (application?.status === 'rejected') {
-        setEmailError('This application was not approved. Write to support@nayacura.com for assistance.');
+      setIsLoading(false);
+      if (result.status === 'invalid_password' || result.status === 'pending' || result.status === 'rejected') {
+        setEmailError(result.message);
         return;
       }
     }
@@ -247,9 +278,14 @@ export default function PatientLoginPage({ onLoginSuccess, currentUser, onLogout
     setIsLoading(true);
     setTimeout(() => {
       setIsLoading(false);
+      const demoEmail = email || currentConfig.demoUser.email;
+      const override = selectedRole === 'doctor'
+        ? getDoctorProfileOverride(demoEmail, currentConfig.demoUser.name)
+        : null;
       const userObj = {
         ...currentConfig.demoUser,
-        email: email || currentConfig.demoUser.email
+        ...(override || {}),
+        email: demoEmail,
       };
 
       if (onLoginSuccess) onLoginSuccess(userObj);
@@ -427,7 +463,7 @@ export default function PatientLoginPage({ onLoginSuccess, currentUser, onLogout
                 ) : (
                   <div className="mt-6 rounded-2xl border border-slate-200/80 bg-slate-50 px-4 py-2.5 text-xs font-bold text-[#0B3B82] flex items-center gap-2">
                     <Mail className="h-4 w-4 text-[#16A34A]" />
-                    <span>Email &amp; Credentials Sign In (No phone number required)</span>
+                    <span>Sign in with the email and password from your approval mail</span>
                   </div>
                 )}
 
@@ -469,13 +505,23 @@ export default function PatientLoginPage({ onLoginSuccess, currentUser, onLogout
                               setEmail(e.target.value);
                               if (emailError) setEmailError('');
                             }}
-                            className="w-full pl-10 pr-4 py-3 rounded-2xl border border-slate-200 text-sm font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#16A34A]/20 focus:border-[#16A34A] transition-all bg-slate-50/50 focus:bg-white"
+                            className={`w-full pl-10 pr-4 py-3 rounded-2xl border text-sm font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 transition-all bg-slate-50/50 focus:bg-white ${
+                              /already used|valid email/i.test(emailError)
+                                ? 'border-red-500 focus:ring-red-200 focus:border-red-500'
+                                : 'border-slate-200 focus:ring-[#16A34A]/20 focus:border-[#16A34A]'
+                            }`}
                             required
                           />
                         </div>
-                        <p className="mt-1 text-[11px] text-slate-500">
-                          A welcome email will be sent from <strong>{HELLO_EMAIL}</strong> to this address.
-                        </p>
+                        {/already used|valid email/i.test(emailError) ? (
+                          <p role="alert" className="mt-1.5 text-xs font-bold text-red-600 flex items-center gap-1">
+                            <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {emailError}
+                          </p>
+                        ) : (
+                          <p className="mt-1 text-[11px] text-slate-500">
+                            A welcome email will be sent from <strong>{HELLO_EMAIL}</strong> to this address.
+                          </p>
+                        )}
                       </div>
 
                       <div>
@@ -503,9 +549,9 @@ export default function PatientLoginPage({ onLoginSuccess, currentUser, onLogout
                             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                           </button>
                         </div>
-                        {emailError && (
-                          <p className="mt-1.5 text-xs font-bold text-red-600 flex items-center gap-1">
-                            <AlertCircle className="h-3.5 w-3.5" /> {emailError}
+                        {emailError && !/already used|valid email/i.test(emailError) && (
+                          <p role="alert" className="mt-1.5 text-xs font-bold text-red-600 flex items-center gap-1">
+                            <AlertCircle className="h-3.5 w-3.5 shrink-0" /> {emailError}
                           </p>
                         )}
                       </div>
@@ -527,21 +573,6 @@ export default function PatientLoginPage({ onLoginSuccess, currentUser, onLogout
                     </form>
                   ) : (
                     <form onSubmit={handleEmailLogin} className="space-y-4">
-                      {selectedRole === 'doctor' && (
-                        <div>
-                          <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
-                            Medical Council Registration Number
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="e.g. TN-MED-44819"
-                            value={doctorRegNo}
-                            onChange={(e) => setDoctorRegNo(e.target.value)}
-                            className="w-full px-4 py-3 rounded-2xl border border-slate-200 text-sm font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-[#16A34A]/20 focus:border-[#16A34A] transition-all bg-slate-50/50 focus:bg-white"
-                          />
-                        </div>
-                      )}
-
                       <div>
                         <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-2">
                           {selectedRole === 'admin' ? 'Administrator Email' : selectedRole === 'doctor' ? 'Doctor Email Address' : 'Email Address'}
@@ -755,7 +786,7 @@ export default function PatientLoginPage({ onLoginSuccess, currentUser, onLogout
                           <div>
                             <h3 className="text-xs font-bold text-[#0B3B82]">Private Doctor Consultations</h3>
                             <p className="text-[11px] text-slate-600 mt-0.5 leading-relaxed">
-                              Connect with verified senior sexologists & counselors over encrypted video calls or in-clinic visits.
+                              Connect with verified senior sexologists &amp; counselors over encrypted online video or audio calls.
                             </p>
                           </div>
                         </div>

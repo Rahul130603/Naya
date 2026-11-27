@@ -23,6 +23,9 @@ import { supportRouter } from './routes/support';
 import { newsletterRouter } from './routes/newsletter';
 import { demoRoomsRouter } from './routes/demoRooms';
 import { bookingRequestsRouter } from './routes/bookingRequests';
+import { publicActivityRouter } from './routes/publicActivity';
+import { practiceScheduleRouter } from './routes/practiceSchedule';
+import { doctorRegistryRouter } from './routes/doctorRegistry';
 
 export function createApp() {
   const app = express();
@@ -115,6 +118,9 @@ export function createApp() {
   app.use('/api/support', supportRouter);
   app.use('/api/newsletter', newsletterRouter);
   app.use('/api', bookingRequestsRouter);
+  app.use('/api', publicActivityRouter);
+  app.use('/api', practiceScheduleRouter);
+  app.use('/api', doctorRegistryRouter);
 
   app.use('/api', notFoundHandler);
 

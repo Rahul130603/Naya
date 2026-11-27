@@ -37,6 +37,7 @@ import { sendDoctorApplicationReceived, sendPasswordReset, sendPatientWelcomeEma
 import { supportReference } from '../utils/crypto';
 import { clearAuthCookies } from '../middleware/csrf';
 import { discardApplicationDocument, storeApplicationDocument } from '../services/clinicianApplicationDocuments';
+import { EMAIL_ALREADY_USED_MESSAGE, isEmailUsedInRegistry } from './doctorRegistry';
 
 export const authRouter = Router();
 
@@ -51,6 +52,10 @@ authRouter.get('/csrf', (req, res) => {
 
 authRouter.post('/doctor-applications', formLimiter, validate(doctorApplicationSchema), asyncHandler(async (req, res) => {
   const input = req.body as z.infer<typeof doctorApplicationSchema>;
+  const normalizedEmail = normalizeEmail(input.email);
+  if (await isEmailUsedInRegistry(normalizedEmail)) {
+    throw new AppError(EMAIL_ALREADY_USED_MESSAGE, 409, 'ACCOUNT_EXISTS');
+  }
   const specialty = await prisma.specialization.findUnique({ where: { slug: input.specialization } });
   if (!specialty) throw new AppError('Choose an available specialty.', 422, 'INVALID_SPECIALTY');
 
@@ -63,7 +68,7 @@ authRouter.post('/doctor-applications', formLimiter, validate(doctorApplicationS
 
     user = await prisma.user.create({
       data: {
-        email: input.email,
+        email: normalizedEmail,
         name: input.name,
         role: 'DOCTOR',
         passwordHash,
@@ -112,13 +117,10 @@ authRouter.post(
       password: string;
     };
     const normalized = normalizeEmail(email);
-    const existing = await prisma.user.findUnique({ where: { email: normalized } });
+    const existing = (await isEmailUsedInRegistry(normalized))
+      || Boolean(await prisma.user.findUnique({ where: { email: normalized } }));
     if (existing) {
-      throw new AppError(
-        'An account may already exist for this email. Try signing in or resetting your password.',
-        409,
-        'ACCOUNT_EXISTS',
-      );
+      throw new AppError(EMAIL_ALREADY_USED_MESSAGE, 409, 'ACCOUNT_EXISTS');
     }
 
     const passwordHash = await hashPassword(password);
@@ -218,6 +220,15 @@ authRouter.post(
 
     if (user.role === 'ADMIN') {
       res.setHeader('Cache-Control', 'no-store');
+      // Local development shortcut for the demo admin console. Production keeps
+      // the authenticator requirement unconditionally.
+      if (req.body?.skipMfa === true && !env.isProduction) {
+        await createSession(req, res, user.id, true);
+        await prisma.user.update({ where: { id: user.id }, data: { lastLoginAt: new Date() } });
+        await audit({ req, actorId: user.id, actorRole: 'ADMIN', action: 'ADMIN_MFA_SKIPPED_DEV', entityType: 'User', entityId: user.id });
+        res.json({ user: await userPayload(user.id) });
+        return;
+      }
       res.status(202).json(await beginAdminMfa(user.id, user.email));
       return;
     }
