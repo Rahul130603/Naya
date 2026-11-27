@@ -372,14 +372,6 @@ export default function PatientLoginPage({ onLoginSuccess, currentUser, onLogout
                   {currentConfig.subtitle}
                 </p>
 
-                {selectedRole === 'doctor' && (
-                  <div className="mt-4 flex flex-wrap items-center gap-2 rounded-2xl border border-purple-200 bg-purple-50/60 px-4 py-3 text-xs font-semibold text-purple-900">
-                    <Stethoscope className="h-4 w-4 text-purple-700" />
-                    <span>New to Nayacura?</span>
-                    <Link to="/doctor-register" className="font-bold underline hover:text-[#0B3B82]">Apply as a clinician →</Link>
-                  </div>
-                )}
-
                 {/* Success Notification */}
                 {loginSuccessMessage && (
                   <div className="mt-5 p-4 rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-sm font-bold space-y-2 animate-fade-in">
