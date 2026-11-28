@@ -12,4 +12,4 @@ Disallow: /doctor-login
 Disallow: /admin-login
 Disallow: /doctor-register
 
-Sitemap: https://naya-syft.onrender.com/sitemap.xml
+Sitemap: https://www.nayacura.com/sitemap.xml
