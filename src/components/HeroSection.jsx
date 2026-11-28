@@ -9,30 +9,33 @@ import {
   ArrowRight, 
   TrendingUp,
   Lock,
-  Package,
   CalendarDays,
   LayoutGrid
 } from 'lucide-react';
 import SpotlightCard from './ui/SpotlightCard';
 import AnimatedCounter from './ui/AnimatedCounter';
-import ShinyText from './ui/ShinyText';
 import MagneticButton from './ui/MagneticButton';
 import Magnet from './ui/Magnet';
-import BorderBeam from './ui/BorderBeam';
 import { SPECIALTIES, SYMPTOMS_LIST, DOCTORS } from '../data/healthcareData';
 
 const HERO_HEADLINES = [
   {
     first: <>Science-Backed <span className="text-brand-navy">Sexual Wellness</span></>,
     second: <>Reimagined with <span className="text-brand-navy">naya</span><span className="text-brand-green">cura</span></>,
+    banner: '/hero-wellness-banner.jpg',
+    positionClass: 'object-[84%_34%] sm:object-[center_38%]',
   },
   {
     first: <>Confidential <span className="text-brand-navy">Sexual Wellness</span></>,
     second: <>Guided by <span className="text-brand-green">Verified Specialists</span></>,
+    banner: '/hero-specialist-banner.jpg',
+    positionClass: 'object-[86%_40%] sm:object-[center_48%]',
   },
   {
     first: <>Judgment-Free <span className="text-brand-navy">Intimate Care</span></>,
     second: <>For Your Body and <span className="text-brand-green">Your Pace</span></>,
+    banner: '/hero-care-banner.jpg',
+    positionClass: 'object-[86%_45%] sm:object-[center_52%]',
   },
 ];
 const HEADLINE_INTERVAL_MS = 5000;
@@ -77,91 +80,93 @@ export default function HeroSection({
   );
 
   return (
-    <section className="relative overflow-hidden bg-gradient-to-b from-emerald-50/40 via-white to-slate-50 pt-10 pb-16">
+    <section className="relative overflow-hidden bg-gradient-to-b from-white via-white to-slate-50 pb-16">
       {/* Background Decorative Glow */}
       <div className="absolute top-0 left-1/4 -z-10 h-96 w-96 rounded-full bg-brand-green/10 blur-3xl pointer-events-none" />
       <div className="absolute top-20 right-10 -z-10 h-96 w-96 rounded-full bg-brand-navy/10 blur-3xl pointer-events-none" />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        
-        {/* Main Hero Header */}
-        <div className="text-center max-w-3xl mx-auto mb-10">
-          <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50/90 px-4 py-1.5 text-xs font-bold text-brand-green-dark mb-4 shadow-sm animate-fade-in">
-            <Lock className="h-3.5 w-3.5 text-brand-green" />
-            <span>100% Confidential • Stigma-Free • <ShinyText text="European Board & MCI Certified" className="text-xs" /></span>
-          </div>
+      {/* Full-Width Translucent Hero Banner covering the top hero header area */}
+      <div className="relative w-full overflow-hidden pt-8 pb-10 sm:pt-12 sm:pb-14">
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden bg-white">
+          {HERO_HEADLINES.map((slide, index) => (
+            <img
+              key={slide.banner}
+              src={slide.banner}
+              alt=""
+              className={`absolute inset-0 h-full w-full object-cover ${slide.positionClass} contrast-[1.04] saturate-[1.06] transition-opacity duration-700 ease-out ${
+                index === headlineIndex ? 'opacity-[0.78] sm:opacity-[0.90]' : 'opacity-0'
+              }`}
+            />
+          ))}
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent via-78% to-white" />
+          <div className="absolute inset-0 bg-[radial-gradient(ellipse_74%_48%_at_50%_44%,rgba(255,255,255,0.52)_0%,rgba(255,255,255,0.16)_60%,transparent_100%)] sm:bg-[radial-gradient(ellipse_36%_56%_at_50%_46%,rgba(255,255,255,0.50)_0%,rgba(255,255,255,0.14)_58%,transparent_100%)]" />
+        </div>
 
-          <h1 className="text-3xl sm:text-5xl font-extrabold tracking-tight text-slate-900 leading-tight">
-            <span className="sr-only">Science-Backed Sexual Wellness Reimagined with Nayacura</span>
-            <span aria-hidden="true" className="grid">
-              {HERO_HEADLINES.map((headline, index) => (
+        <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Main Hero Header */}
+          <div className="text-center max-w-3xl mx-auto">
+            <h1 className="text-[27px] sm:text-5xl font-extrabold tracking-tight text-slate-900 leading-tight">
+              <span className="sr-only">Science-Backed Sexual Wellness Reimagined with Nayacura</span>
+              <span aria-hidden="true" className="grid">
+                {HERO_HEADLINES.map((headline, index) => (
+                  <span
+                    key={index}
+                    className={`col-start-1 row-start-1 transition-all duration-700 ease-out ${
+                      index === headlineIndex ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-2 opacity-0'
+                    }`}
+                  >
+                    {headline.first}
+                    <br className="hidden sm:inline" />{' '}
+                    {headline.second}
+                  </span>
+                ))}
+              </span>
+            </h1>
+
+            <div aria-hidden="true" className="mx-auto mt-4 flex w-40 items-center gap-1.5">
+              {HERO_HEADLINES.map((_, index) => (
                 <span
                   key={index}
-                  className={`col-start-1 row-start-1 transition-all duration-700 ease-out ${
-                    index === headlineIndex ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-2 opacity-0'
-                  }`}
+                  className={`relative h-1 flex-1 overflow-hidden rounded-full ${index === headlineIndex ? 'bg-brand-green/25' : 'bg-slate-200'}`}
                 >
-                  {headline.first}
-                  <br className="hidden sm:inline" />{' '}
-                  {headline.second}
+                  {index === headlineIndex && (
+                    <span key={headlineIndex} className="hero-progress-fill absolute inset-y-0 left-0 rounded-full bg-brand-green" />
+                  )}
                 </span>
               ))}
-            </span>
-          </h1>
+            </div>
 
-          <div aria-hidden="true" className="mx-auto mt-4 flex w-40 items-center gap-1.5">
-            {HERO_HEADLINES.map((_, index) => (
-              <span
-                key={index}
-                className={`relative h-1 flex-1 overflow-hidden rounded-full ${index === headlineIndex ? 'bg-brand-green/25' : 'bg-slate-200'}`}
+            <p className="mt-3 sm:mt-4 text-[14px] sm:text-lg font-medium text-slate-900 sm:text-slate-800 leading-relaxed">
+              Overcome erectile dysfunction, premature ejaculation, low libido, vaginismus and intimate anxiety with verified sexologists, discreet at-home testing, and judgment-free medical care.
+            </p>
+
+            <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+              <Magnet padding={14} magnetStrength={10} maxOffset={6} wrapperClassName="hero-cta-magnet" innerClassName="flex">
+              <button
+                type="button"
+                onClick={() => onNavigateToTab('booking')}
+                className="inline-flex h-11 w-[210px] items-center justify-center gap-2.5 rounded-full border border-brand-navy bg-brand-navy text-xs font-bold text-white shadow-md transition-[background-color,box-shadow] duration-200 hover:bg-brand-navy-dark hover:shadow-glow-navy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-navy focus-visible:ring-offset-2"
               >
-                {index === headlineIndex && (
-                  <span key={headlineIndex} className="hero-progress-fill absolute inset-y-0 left-0 rounded-full bg-brand-green" />
-                )}
-              </span>
-            ))}
-          </div>
-
-          <p className="mt-4 text-base sm:text-lg text-slate-600 leading-relaxed">
-            Overcome erectile dysfunction, premature ejaculation, low libido, vaginismus and intimate anxiety with verified sexologists, discreet at-home testing, and judgment-free medical care.
-          </p>
-
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
-            <Magnet padding={14} magnetStrength={10} maxOffset={6} wrapperClassName="hero-cta-magnet" innerClassName="flex">
-            <button
-              type="button"
-              onClick={() => onNavigateToTab('booking')}
-              className="inline-flex h-11 w-[210px] items-center justify-center gap-2.5 rounded-full border border-brand-navy bg-brand-navy text-xs font-bold text-white shadow-md transition-[background-color,box-shadow] duration-200 hover:bg-brand-navy-dark hover:shadow-glow-navy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-navy focus-visible:ring-offset-2"
-            >
-              <CalendarDays className="h-4 w-4 shrink-0" aria-hidden="true" />
-              <span>Book Appointment</span>
-              <ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" />
-            </button>
-            </Magnet>
-            <Magnet padding={14} magnetStrength={10} maxOffset={6} wrapperClassName="hero-cta-magnet" innerClassName="flex">
-            <a
-              href="#services"
-              className="inline-flex h-11 w-[178px] items-center justify-center gap-2.5 rounded-full border border-brand-navy bg-white text-xs font-bold text-brand-navy transition-colors hover:bg-brand-navy-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-navy focus-visible:ring-offset-2"
-            >
-              <LayoutGrid className="h-4 w-4 shrink-0" aria-hidden="true" />
-              <span>Explore Services</span>
-            </a>
-            </Magnet>
-          </div>
-
-          {/* Discreet Promise Pill */}
-          <div className="mt-4 flex flex-wrap items-center justify-center gap-3 text-xs text-slate-500 font-semibold">
-            <span className="flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1 rounded-full shadow-sm">
-              <ShieldCheck className="w-4 h-4 text-brand-green" /> Zero Stigma & Total Anonymity
-            </span>
-            <span className="flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1 rounded-full shadow-sm">
-              <Package className="w-4 h-4 text-brand-navy" /> 100% Unbranded Plain Box Packaging
-            </span>
-            <span className="flex items-center gap-1.5 bg-white border border-slate-200 px-3 py-1 rounded-full shadow-sm">
-              <Lock className="w-4 h-4 text-brand-green" /> Doctor-Patient Confidentiality
-            </span>
+                <CalendarDays className="h-4 w-4 shrink-0" aria-hidden="true" />
+                <span>Book Appointment</span>
+                <ArrowRight className="h-4 w-4 shrink-0" aria-hidden="true" />
+              </button>
+              </Magnet>
+              <Magnet padding={14} magnetStrength={10} maxOffset={6} wrapperClassName="hero-cta-magnet" innerClassName="flex">
+              <a
+                href="#services"
+                className="inline-flex h-11 w-[178px] items-center justify-center gap-2.5 rounded-full border border-brand-navy bg-white/95 text-xs font-bold text-brand-navy transition-colors hover:bg-brand-navy-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-navy focus-visible:ring-offset-2"
+              >
+                <LayoutGrid className="h-4 w-4 shrink-0" aria-hidden="true" />
+                <span>Explore Services</span>
+              </a>
+              </Magnet>
+            </div>
           </div>
         </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
         {/* Practo-Style Universal Search Bar for Sexual Health */}
         <div className="max-w-4xl mx-auto mb-12 relative z-30">
@@ -313,7 +318,6 @@ export default function HeroSection({
             spotlightColor="rgba(22, 163, 74, 0.18)"
             className="group cursor-pointer p-6 hover:-translate-y-1 transition-all relative overflow-hidden"
           >
-            <BorderBeam color="#16A34A" duration={6} className="opacity-40 group-hover:opacity-100 transition-opacity duration-300" />
             <div onClick={() => onStartVideoConsult()} className="h-full flex flex-col justify-between relative z-10">
               <div>
                 <div className="flex items-center justify-between mb-4">

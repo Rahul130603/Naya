@@ -50,7 +50,7 @@ export default function Navbar({
       path: '/lab-tests',
       icon: FlaskConical,
       line1: 'Hormone &',
-      line2: 'STI Tests',
+      line2: 'Tests',
     },
     {
       path: '/intimate-procedures',
@@ -81,12 +81,12 @@ export default function Navbar({
   return (
     <header className="sticky top-0 z-50 w-full bg-white border-b border-slate-200/90 shadow-sm">
       <div className="max-w-[1440px] mx-auto px-4 sm:px-6">
-        <div className="flex h-16 sm:h-20 items-center justify-between gap-2 xl:gap-4">
+        <div className="flex h-16 sm:h-20 items-center justify-between gap-2 xl:gap-3">
           
           {/* 1. Logo (shifted right + slightly larger) */}
           <Link 
             to="/" 
-            className="flex items-center flex-shrink-0 group focus:outline-none sm:ml-4 lg:ml-10 mr-2 xl:mr-4"
+            className="flex items-center flex-shrink-0 group focus:outline-none sm:ml-2 xl:ml-3"
           >
             <img 
               src="/logo.png" 
@@ -103,8 +103,8 @@ export default function Navbar({
             </div>
           </Link>
 
-          {/* 2. Center Navigation Tabs (Exact 2-Line + Icon Design from Screenshot) */}
-          <nav aria-label="Main navigation" className="hidden xl:flex items-center space-x-1 xl:space-x-2 flex-1 justify-center">
+          {/* 2. Center Navigation Tabs (2-Line Stacked or Single-Line + Icon Design) */}
+          <nav aria-label="Main navigation" className="hidden xl:flex items-center gap-0.5 2xl:gap-1.5 flex-1 justify-center min-w-0">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = location.pathname === item.path || 
@@ -114,7 +114,7 @@ export default function Navbar({
                 <Link
                   key={item.path}
                   to={item.path}
-                  className={`relative flex items-center space-x-2 px-2.5 xl:px-3 py-2.5 rounded-2xl transition-all duration-200 group ${
+                  className={`relative flex items-center shrink-0 gap-1.5 2xl:gap-2 px-2 2xl:px-2.5 py-2.5 rounded-2xl transition-all duration-200 group ${
                     isActive
                       ? 'bg-[#E8F8EE] text-[#15803D]'
                       : 'text-slate-800 hover:text-[#0B3B82] hover:bg-slate-50'
@@ -124,13 +124,13 @@ export default function Navbar({
                   <div className={`flex items-center justify-center flex-shrink-0 transition-colors ${
                     isActive ? 'text-[#16A34A]' : 'text-[#0B3B82] group-hover:text-[#16A34A]'
                   }`}>
-                    <Icon className="w-5 h-5 stroke-[2.2]" />
+                    <Icon className="w-[18px] h-[18px] 2xl:w-5 2xl:h-5 stroke-[2.2]" />
                   </div>
 
-                  {/* 2-Line Stacked Label */}
+                  {/* Label (2-line stacked or single-line) */}
                   <div className="flex flex-col text-left leading-tight">
                     <div className="flex items-center gap-1">
-                      <span className={`text-[12px] font-bold ${
+                      <span className={`whitespace-nowrap text-[12px] font-bold ${
                         isActive ? 'text-[#15803D]' : 'text-slate-900 group-hover:text-[#0B3B82]'
                       }`}>
                         {item.line1}
@@ -141,11 +141,13 @@ export default function Navbar({
                         </span>
                       )}
                     </div>
-                    <span className={`text-[12px] font-bold ${
-                      isActive ? 'text-[#15803D]' : 'text-slate-800 group-hover:text-[#0B3B82]'
-                    }`}>
-                      {item.line2}
-                    </span>
+                    {item.line2 && (
+                      <span className={`whitespace-nowrap text-[12px] font-bold ${
+                        isActive ? 'text-[#15803D]' : 'text-slate-800 group-hover:text-[#0B3B82]'
+                      }`}>
+                        {item.line2}
+                      </span>
+                    )}
                   </div>
 
                   {/* Solid Green Bottom Underline for Active Item (Exact to Screenshot) */}
@@ -158,13 +160,13 @@ export default function Navbar({
           </nav>
 
           {/* 3. Right Action Controls (Pill City Selector + Pill My Bookings + Navy Private Login) */}
-          <div className="hidden xl:flex items-center space-x-2.5 xl:space-x-3 flex-shrink-0">
+          <div className="hidden xl:flex items-center gap-2 2xl:gap-2.5 flex-shrink-0">
             
             {/* City Selector Pill */}
             <div className="relative">
               <button
                 onClick={() => setCityDropdownOpen(!cityDropdownOpen)}
-                className="flex items-center space-x-1.5 rounded-full border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-800 hover:border-slate-300 hover:bg-slate-50 transition shadow-sm"
+                className="flex items-center space-x-1.5 whitespace-nowrap rounded-full border border-slate-200 bg-white px-3 2xl:px-3.5 py-2 text-xs font-semibold text-slate-800 hover:border-slate-300 hover:bg-slate-50 transition shadow-sm"
               >
                 <MapPin className="h-3.5 w-3.5 text-[#0B3B82]" />
                 <span>{selectedCity}</span>
@@ -206,7 +208,7 @@ export default function Navbar({
             {/* My Bookings Pill */}
             <button
               onClick={onOpenAppointmentsModal}
-              className="flex items-center space-x-1.5 rounded-full border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-800 hover:border-slate-300 hover:bg-slate-50 transition shadow-sm"
+              className="flex items-center space-x-1.5 whitespace-nowrap rounded-full border border-slate-200 bg-white px-3 2xl:px-3.5 py-2 text-xs font-semibold text-slate-800 hover:border-slate-300 hover:bg-slate-50 transition shadow-sm"
             >
               <CalendarCheck className="h-3.5 w-3.5 text-[#0B3B82]" />
               <span>My Bookings</span>
@@ -215,7 +217,7 @@ export default function Navbar({
             {/* Naya AI Direct Header Pill */}
             <Link
               to="/ai"
-              className="flex items-center space-x-1.5 rounded-full bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 hover:from-emerald-700 hover:to-teal-700 px-3.5 py-2 text-xs font-bold text-white shadow-md hover:shadow-emerald-500/30 transition-all hover:scale-102 group"
+              className="flex items-center space-x-1.5 whitespace-nowrap rounded-full bg-gradient-to-r from-emerald-600 via-emerald-500 to-teal-600 hover:from-emerald-700 hover:to-teal-700 px-3 2xl:px-3.5 py-2 text-xs font-bold text-white shadow-md hover:shadow-emerald-500/30 transition-all hover:scale-102 group"
               title="Open Naya AI Confidential Chat"
             >
               <Sparkles className="h-3.5 w-3.5 text-emerald-200 group-hover:rotate-12 transition-transform animate-pulse" />
@@ -259,7 +261,7 @@ export default function Navbar({
             ) : (
               <Link
                 to="/login"
-                className="flex items-center space-x-1.5 rounded-full bg-[#0B3B82] hover:bg-[#072658] px-4 py-2 text-xs font-bold text-white transition shadow-sm hover:shadow-md"
+                className="flex items-center space-x-1.5 whitespace-nowrap rounded-full bg-[#0B3B82] hover:bg-[#072658] px-3.5 2xl:px-4 py-2 text-xs font-bold text-white transition shadow-sm hover:shadow-md"
               >
                 <Lock className="h-3.5 w-3.5 text-emerald-400" />
                 <ShinyText text="Private Login" variant="white" className="text-xs" />
@@ -309,7 +311,7 @@ export default function Navbar({
               >
                 <div className="flex items-center space-x-3">
                   <Icon className={`h-5 w-5 ${isActive ? 'text-[#16A34A]' : 'text-[#0B3B82]'}`} />
-                  <span>{item.line1} {item.line2}</span>
+                  <span>{[item.line1, item.line2].filter(Boolean).join(' ')}</span>
                   {item.badge && (
                     <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-[#15803D] text-[10px] font-extrabold uppercase tracking-wider">
                       {item.badge}
